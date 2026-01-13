@@ -11,7 +11,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Zig
-        uses: ziglang/setup-zig@v1
+        uses: mlugg/setup-zig@v2
         with:
           version: 0.15.2
       - name: Replay fixtures (check)
