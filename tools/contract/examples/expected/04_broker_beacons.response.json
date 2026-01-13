@@ -1,0 +1,28 @@
+{
+  "contractVersion": "1.0.0",
+  "ok": true,
+  "requestId": "req-04-broker-beacons",
+  "payload": {
+    "method": "ib.beacons",
+    "charged": 0.0,
+    "result": {
+      "beacons": [
+        {
+          "beaconId": "__ANY__",
+          "alertLevel": "__ANY__",
+          "location": {
+            "x": "__ANY__",
+            "y": "__ANY__"
+          },
+          "vulnerabilities": [
+            "__ANY__"
+          ]
+        }
+      ]
+    },
+    "metadata": {
+      "tick": "__ANY__",
+      "noisy": false
+    }
+  }
+}

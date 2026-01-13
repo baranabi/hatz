@@ -1,0 +1,47 @@
+{
+  "contractVersion": "1.0.0",
+  "ok": true,
+  "requestId": "req-08-advance-2",
+  "payload": {
+    "runId": "__ANY__",
+    "fromTick": "__ANY__",
+    "toTick": "__ANY__",
+    "eventsEmitted": 0,
+    "defaultRequestResults": [
+      {
+        "method": "ib.beacons",
+        "result": {
+          "beacons": [
+            {
+              "beaconId": "__ANY__",
+              "alertLevel": "__ANY__",
+              "location": {
+                "x": "__ANY__",
+                "y": "__ANY__"
+              },
+              "vulnerabilities": [
+                "__ANY__"
+              ]
+            }
+          ]
+        },
+        "metadata": {
+          "tick": "__ANY__",
+          "noisy": false,
+          "charged": 0.0
+        }
+      },
+      {
+        "method": "ib.events_history",
+        "result": {
+          "events": []
+        },
+        "metadata": {
+          "tick": "__ANY__",
+          "noisy": false,
+          "charged": 0.0
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "contractVersion": "1.0.0",
+  "ok": true,
+  "requestId": "req-03-broker-world-dimensions",
+  "payload": {
+    "method": "ib.world_dimensions",
+    "charged": 0.0,
+    "result": {
+      "x": {
+        "min": 0,
+        "max": 50
+      },
+      "y": {
+        "min": 0,
+        "max": 50
+      }
+    },
+    "metadata": {
+      "tick": "__ANY__",
+      "noisy": false
+    }
+  }
+}

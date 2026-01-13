@@ -1,0 +1,10 @@
+{
+  "contractVersion": "1.0.0",
+  "ok": true,
+  "requestId": "req-07-action-arrest-hat",
+  "payload": {
+    "hatId": 42,
+    "status": "SUCCESSFUL",
+    "arrestedUntilTick": "__ANY__"
+  }
+}

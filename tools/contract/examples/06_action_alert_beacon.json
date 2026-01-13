@@ -1,0 +1,11 @@
+{
+  "contractVersion": "1.0.0",
+  "type": "action.alert_beacon",
+  "requestId": "req-06-action-alert-beacon",
+  "payload": {
+    "runId": "run-12345-1",
+    "analystId": "human",
+    "beaconId": 0,
+    "alertLevel": "LEVEL_TWO"
+  }
+}

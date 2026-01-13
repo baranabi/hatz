@@ -1,0 +1,9 @@
+{
+  "contractVersion": "1.0.0",
+  "ok": true,
+  "requestId": "req-06-action-alert-beacon",
+  "payload": {
+    "beaconId": 0,
+    "alertLevel": "LEVEL_TWO"
+  }
+}

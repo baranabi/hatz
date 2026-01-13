@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hats.contract/v1/sim",
+  "title": "Hats Contract Simulation Messages (v1)",
+  "type": "object",
+  "required": ["requestByType", "responseByType"],
+  "additionalProperties": false,
+  "properties": {
+    "requestByType": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sim.initialize": { "$ref": "#/$defs/SimInitializeRequestPayload" },
+        "sim.advance": { "$ref": "#/$defs/SimAdvanceRequestPayload" },
+        "sim.end": { "$ref": "#/$defs/SimEndRequestPayload" },
+
+        "action.alert_beacon": { "$ref": "#/$defs/ActionAlertBeaconRequestPayload" },
+        "action.arrest_hat": { "$ref": "#/$defs/ActionArrestHatRequestPayload" },
+
+        "defaults.add": { "$ref": "#/$defs/DefaultsAddRequestPayload" },
+        "defaults.remove": { "$ref": "#/$defs/DefaultsRemoveRequestPayload" },
+        "defaults.clear": { "$ref": "#/$defs/DefaultsClearRequestPayload" },
+        "defaults.list": { "$ref": "#/$defs/DefaultsListRequestPayload" }
+      }
+    },
+
+    "responseByType": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sim.initialize": { "$ref": "#/$defs/SimInitializeResponsePayload" },
+        "sim.advance": { "$ref": "#/$defs/SimAdvanceResponsePayload" },
+        "sim.end": { "$ref": "#/$defs/SimEndResponsePayload" },
+
+        "action.alert_beacon": { "$ref": "#/$defs/ActionAlertBeaconResponsePayload" },
+        "action.arrest_hat": { "$ref": "#/$defs/ActionArrestHatResponsePayload" },
+
+        "defaults.add": { "$ref": "#/$defs/DefaultsMutationResponsePayload" },
+        "defaults.remove": { "$ref": "#/$defs/DefaultsMutationResponsePayload" },
+        "defaults.clear": { "$ref": "#/$defs/DefaultsMutationResponsePayload" },
+        "defaults.list": { "$ref": "#/$defs/DefaultsListResponsePayload" }
+      }
+    }
+  },
+
+  "$defs": {
+    "RunId": { "$ref": "protocol.schema.json#/$defs/RunId" },
+    "AnalystId": { "$ref": "protocol.schema.json#/$defs/AnalystId" },
+    "Tick": { "$ref": "protocol.schema.json#/$defs/Tick" },
+    "BeaconId": { "$ref": "protocol.schema.json#/$defs/BeaconId" },
+    "HatId": { "$ref": "protocol.schema.json#/$defs/HatId" },
+    "Location": { "$ref": "protocol.schema.json#/$defs/Location" },
+    "AlertLevel": { "$ref": "protocol.schema.json#/$defs/AlertLevel" },
+    "ArrestStatus": { "$ref": "protocol.schema.json#/$defs/ArrestStatus" },
+    "DefaultIbRequest": { "$ref": "protocol.schema.json#/$defs/DefaultIbRequest" },
+    "DefaultIbResult": { "$ref": "protocol.schema.json#/$defs/DefaultIbResult" },
+
+    "SimInitializeRequestPayload": {
+      "type": "object",
+      "required": ["seed", "params"],
+      "additionalProperties": false,
+      "properties": {
+        "seed": { "type": "integer", "minimum": 0 },
+        "params": {
+          "type": "object",
+          "description": "Simulation parameters. v1 treats this as open; implementations should validate known keys."
+        }
+      }
+    },
+
+    "SimInitializeResponsePayload": {
+      "type": "object",
+      "required": ["runId", "startedAtTick"],
+      "additionalProperties": false,
+      "properties": {
+        "runId": { "$ref": "#/$defs/RunId" },
+        "startedAtTick": { "$ref": "#/$defs/Tick" }
+      }
+    },
+
+    "SimAdvanceRequestPayload": {
+      "type": "object",
+      "required": ["runId", "numberOfTicks"],
+      "additionalProperties": false,
+      "properties": {
+        "runId": { "$ref": "#/$defs/RunId" },
+        "numberOfTicks": { "type": "integer", "minimum": 1, "maximum": 100000 },
+        "timeIt": { "type": "boolean", "default": false },
+        "includeDefaultRequestResults": { "type": "boolean", "default": true }
+      }
+    },
+
+    "SimAdvanceResponsePayload": {
+      "type": "object",
+      "required": ["runId", "fromTick", "toTick", "eventsEmitted"],
+      "additionalProperties": false,
+      "properties": {
+        "runId": { "$ref": "#/$defs/RunId" },
+        "fromTick": { "$ref": "#/$defs/Tick" },
+        "toTick": { "$ref": "#/$defs/Tick" },
+        "eventsEmitted": { "type": "integer", "minimum": 0 },
+        "defaultRequestResults": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DefaultIbResult" },
+          "description": "Present when includeDefaultRequestResults=true and defaults exist."
+        },
+        "timing": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "elapsedMs": { "type": "number", "minimum": 0 }
+          },
+          "description": "Present when timeIt=true."
+        }
+      }
+    },
+
+    "SimEndRequestPayload": {
+      "type": "object",
+      "required": ["runId"],
+      "additionalProperties": false,
+      "properties": {
+        "runId": { "$ref": "#/$defs/RunId" }
+      }
+    },
+
+    "SimEndResponsePayload": {
+      "type": "object",
+      "required": ["runId", "finalTick", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "runId": { "$ref": "#/$defs/RunId" },
+        "finalTick": { "$ref": "#/$defs/Tick" },
+        "summary": {
+          "type": "object",
+          "description": "Score/report summary. v1 leaves structure open to allow incremental implementation.",
+          "additionalProperties": true
+        }
+      }
+    },
+
+    "ActionAlertBeaconRequestPayload": {
+      "type": "object",
+      "required": ["runId", "analystId", "beaconId", "alertLevel"],
+      "additionalProperties": false,
+      "properties": {
+        "runId": { "$ref": "#/$defs/RunId" },
+        "analystId": { "$ref": "#/$defs/AnalystId" },
+        "beaconId": { "$ref": "#/$defs/BeaconId" },
+        "alertLevel": { "$ref": "#/$defs/AlertLevel" }
+      }
+    },
+
+    "ActionAlertBeaconResponsePayload": {
+      "type": "object",
+      "required": ["beaconId", "alertLevel"],
+      "additionalProperties": false,
+      "properties": {
+        "beaconId": { "$ref": "#/$defs/BeaconId" },
+        "alertLevel": { "$ref": "#/$defs/AlertLevel" }
+      }
+    },
+
+    "ActionArrestHatRequestPayload": {
+      "type": "object",
+      "required": ["runId", "analystId", "hatId", "location"],
+      "additionalProperties": false,
+      "properties": {
+        "runId": { "$ref": "#/$defs/RunId" },
+        "analystId": { "$ref": "#/$defs/AnalystId" },
+        "hatId": { "$ref": "#/$defs/HatId" },
+        "location": { "$ref": "#/$defs/Location" }
+      }
+    },
+
+    "ActionArrestHatResponsePayload": {
+      "type": "object",
+      "required": ["hatId", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "hatId": { "$ref": "#/$defs/HatId" },
+        "status": { "$ref": "#/$defs/ArrestStatus" },
+        "arrestedUntilTick": {
+          "anyOf": [
+            { "$ref": "#/$defs/Tick" },
+            { "type": "null" }
+          ],
+          "description": "Null when status=FAILURE or if release timing is not known/implemented."
+        }
+      }
+    },
+
+    "DefaultsAddRequestPayload": {
+      "type": "object",
+      "required": ["runId", "analystId", "requests"],
+      "additionalProperties": false,
+      "properties": {
+        "runId": { "$ref": "#/$defs/RunId" },
+        "analystId": { "$ref": "#/$defs/AnalystId" },
+        "requests": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/DefaultIbRequest" }
+        }
+      }
+    },
+
+    "DefaultsRemoveRequestPayload": {
+      "type": "object",
+      "required": ["runId", "analystId", "requests"],
+      "additionalProperties": false,
+      "properties": {
+        "runId": { "$ref": "#/$defs/RunId" },
+        "analystId": { "$ref": "#/$defs/AnalystId" },
+        "requests": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/DefaultIbRequest" }
+        }
+      }
+    },
+
+    "DefaultsClearRequestPayload": {
+      "type": "object",
+      "required": ["runId", "analystId"],
+      "additionalProperties": false,
+      "properties": {
+        "runId": { "$ref": "#/$defs/RunId" },
+        "analystId": { "$ref": "#/$defs/AnalystId" }
+      }
+    },
+
+    "DefaultsListRequestPayload": {
+      "type": "object",
+      "required": ["runId", "analystId"],
+      "additionalProperties": false,
+      "properties": {
+        "runId": { "$ref": "#/$defs/RunId" },
+        "analystId": { "$ref": "#/$defs/AnalystId" }
+      }
+    },
+
+    "DefaultsMutationResponsePayload": {
+      "type": "object",
+      "required": ["totalDefaults"],
+      "additionalProperties": false,
+      "properties": {
+        "totalDefaults": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "DefaultsListResponsePayload": {
+      "type": "object",
+      "required": ["requests"],
+      "additionalProperties": false,
+      "properties": {
+        "requests": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DefaultIbRequest" }
+        }
+      }
+    }
+  }
+}

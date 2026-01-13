@@ -1,0 +1,701 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hats.contract/v1/ib",
+  "title": "Hats Contract Information Broker (v1)",
+  "type": "object",
+  "required": ["broker", "methods"],
+  "additionalProperties": false,
+  "properties": {
+    "broker": {
+      "type": "object",
+      "required": ["request", "response"],
+      "additionalProperties": false,
+      "properties": {
+        "request": { "$ref": "#/$defs/BrokerCallRequestPayload" },
+        "response": { "$ref": "#/$defs/BrokerCallResponsePayload" }
+      }
+    },
+
+    "methods": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ib.world_dimensions": { "$ref": "#/$defs/Method_WorldDimensions" },
+        "ib.beacons": { "$ref": "#/$defs/Method_Beacons" },
+        "ib.all_capabilities": { "$ref": "#/$defs/Method_AllCapabilities" },
+        "ib.benign_organizations": { "$ref": "#/$defs/Method_BenignOrganizations" },
+        "ib.terrorist_organizations": { "$ref": "#/$defs/Method_TerroristOrganizations" },
+        "ib.known_terrorist_hats": { "$ref": "#/$defs/Method_KnownTerroristHats" },
+        "ib.members": { "$ref": "#/$defs/Method_Members" },
+        "ib.hat_advertised_color": { "$ref": "#/$defs/Method_HatAdvertisedColor" },
+        "ib.events_history": { "$ref": "#/$defs/Method_EventsHistory" },
+        "ib.clear_events_history": { "$ref": "#/$defs/Method_ClearEventsHistory" },
+        "ib.arrested_hats": { "$ref": "#/$defs/Method_ArrestedHats" },
+        "ib.last_location": { "$ref": "#/$defs/Method_LastLocation" },
+        "ib.capabilities": { "$ref": "#/$defs/Method_Capabilities" },
+        "ib.meeting_times": { "$ref": "#/$defs/Method_MeetingTimes" },
+        "ib.meeting_location": { "$ref": "#/$defs/Method_MeetingLocation" },
+        "ib.meeting_participants": { "$ref": "#/$defs/Method_MeetingParticipants" },
+        "ib.meeting_trades": { "$ref": "#/$defs/Method_MeetingTrades" }
+      }
+    }
+  },
+
+  "$defs": {
+    "RunId": { "$ref": "protocol.schema.json#/$defs/RunId" },
+    "AnalystId": { "$ref": "protocol.schema.json#/$defs/AnalystId" },
+    "Tick": { "$ref": "protocol.schema.json#/$defs/Tick" },
+    "HatId": { "$ref": "protocol.schema.json#/$defs/HatId" },
+    "BeaconId": { "$ref": "protocol.schema.json#/$defs/BeaconId" },
+    "OrganizationId": { "$ref": "protocol.schema.json#/$defs/OrganizationId" },
+    "CapabilityId": { "$ref": "protocol.schema.json#/$defs/CapabilityId" },
+    "Payment": { "$ref": "protocol.schema.json#/$defs/Payment" },
+    "Location": { "$ref": "protocol.schema.json#/$defs/Location" },
+    "AlertLevel": { "$ref": "protocol.schema.json#/$defs/AlertLevel" },
+    "HatAdvertisedColor": { "$ref": "protocol.schema.json#/$defs/HatAdvertisedColor" },
+    "RequestFrequency": { "$ref": "protocol.schema.json#/$defs/RequestFrequency" },
+
+    "MethodMeta_FreeOncePerTick": {
+      "type": "object",
+      "required": ["paid", "frequency"],
+      "additionalProperties": false,
+      "properties": {
+        "paid": { "const": false },
+        "frequency": { "const": "ONCE_PER_TICK" }
+      }
+    },
+
+    "MethodMeta_FreeUnlimited": {
+      "type": "object",
+      "required": ["paid", "frequency"],
+      "additionalProperties": false,
+      "properties": {
+        "paid": { "const": false },
+        "frequency": { "const": "UNLIMITED" }
+      }
+    },
+
+    "MethodMeta_PaidOncePerTick": {
+      "type": "object",
+      "required": ["paid", "frequency"],
+      "additionalProperties": false,
+      "properties": {
+        "paid": { "const": true },
+        "frequency": { "const": "ONCE_PER_TICK" }
+      }
+    },
+
+    "BrokerCallRequestPayload": {
+      "type": "object",
+      "required": ["runId", "analystId", "method", "args"],
+      "additionalProperties": false,
+      "properties": {
+        "runId": { "$ref": "#/$defs/RunId" },
+        "analystId": { "$ref": "#/$defs/AnalystId" },
+        "method": {
+          "type": "string",
+          "enum": [
+            "ib.world_dimensions",
+            "ib.beacons",
+            "ib.all_capabilities",
+            "ib.benign_organizations",
+            "ib.terrorist_organizations",
+            "ib.known_terrorist_hats",
+            "ib.members",
+            "ib.hat_advertised_color",
+            "ib.events_history",
+            "ib.clear_events_history",
+            "ib.arrested_hats",
+            "ib.last_location",
+            "ib.capabilities",
+            "ib.meeting_times",
+            "ib.meeting_location",
+            "ib.meeting_participants",
+            "ib.meeting_trades"
+          ]
+        },
+        "args": {
+          "type": "object",
+          "description": "Method-specific args. v1: validate by consulting ib.methods[method].args."
+        }
+      }
+    },
+
+    "BrokerCallResponsePayload": {
+      "type": "object",
+      "required": ["method", "charged", "result", "metadata"],
+      "additionalProperties": false,
+      "properties": {
+        "method": { "type": "string", "pattern": "^ib\\.[a-z0-9_]+$" },
+        "charged": { "$ref": "#/$defs/Payment" },
+        "result": {},
+        "metadata": {
+          "type": "object",
+          "required": ["tick", "noisy"],
+          "additionalProperties": false,
+          "properties": {
+            "tick": { "$ref": "#/$defs/Tick" },
+            "noisy": { "type": "boolean" }
+          }
+        }
+      }
+    },
+
+    "MethodEnvelope": {
+      "type": "object",
+      "required": ["meta", "args", "result"],
+      "additionalProperties": false,
+      "properties": {
+        "meta": {
+          "type": "object",
+          "required": ["paid", "frequency"],
+          "additionalProperties": false,
+          "properties": {
+            "paid": { "type": "boolean" },
+            "frequency": { "$ref": "#/$defs/RequestFrequency" }
+          }
+        },
+        "args": { "type": "object" },
+        "result": { "type": "object" }
+      }
+    },
+
+    "Args_None": {
+      "type": "object",
+      "additionalProperties": false
+    },
+
+    "Args_Members": {
+      "type": "object",
+      "required": ["organizationId"],
+      "additionalProperties": false,
+      "properties": {
+        "organizationId": { "$ref": "#/$defs/OrganizationId" }
+      }
+    },
+
+    "Args_HatId": {
+      "type": "object",
+      "required": ["hatId"],
+      "additionalProperties": false,
+      "properties": {
+        "hatId": { "$ref": "#/$defs/HatId" }
+      }
+    },
+
+    "Args_HatId_Payment": {
+      "type": "object",
+      "required": ["hatId", "payment"],
+      "additionalProperties": false,
+      "properties": {
+        "hatId": { "$ref": "#/$defs/HatId" },
+        "payment": { "$ref": "#/$defs/Payment" }
+      }
+    },
+
+    "Args_HatId_Tick_Payment": {
+      "type": "object",
+      "required": ["hatId", "tick", "payment"],
+      "additionalProperties": false,
+      "properties": {
+        "hatId": { "$ref": "#/$defs/HatId" },
+        "tick": { "$ref": "#/$defs/Tick" },
+        "payment": { "$ref": "#/$defs/Payment" }
+      }
+    },
+
+    "Args_Tick_Location_Payment": {
+      "type": "object",
+      "required": ["tick", "location", "payment"],
+      "additionalProperties": false,
+      "properties": {
+        "tick": { "$ref": "#/$defs/Tick" },
+        "location": { "$ref": "#/$defs/Location" },
+        "payment": { "$ref": "#/$defs/Payment" }
+      }
+    },
+
+    "Result_WorldDimensions": {
+      "type": "object",
+      "required": ["x", "y"],
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "type": "object",
+          "required": ["min", "max"],
+          "additionalProperties": false,
+          "properties": {
+            "min": { "type": "integer" },
+            "max": { "type": "integer" }
+          }
+        },
+        "y": {
+          "type": "object",
+          "required": ["min", "max"],
+          "additionalProperties": false,
+          "properties": {
+            "min": { "type": "integer" },
+            "max": { "type": "integer" }
+          }
+        }
+      }
+    },
+
+    "Result_Beacons": {
+      "type": "object",
+      "required": ["beacons"],
+      "additionalProperties": false,
+      "properties": {
+        "beacons": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["beaconId", "alertLevel", "location", "vulnerabilities"],
+            "additionalProperties": false,
+            "properties": {
+              "beaconId": { "$ref": "#/$defs/BeaconId" },
+              "alertLevel": { "$ref": "#/$defs/AlertLevel" },
+              "location": { "$ref": "#/$defs/Location" },
+              "vulnerabilities": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/CapabilityId" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "Result_AllCapabilities": {
+      "type": "object",
+      "required": ["capabilities"],
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/CapabilityId" }
+        }
+      }
+    },
+
+    "Result_Organizations": {
+      "type": "object",
+      "required": ["organizationIds"],
+      "additionalProperties": false,
+      "properties": {
+        "organizationIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/OrganizationId" }
+        }
+      }
+    },
+
+    "Result_HatIds": {
+      "type": "object",
+      "required": ["hatIds"],
+      "additionalProperties": false,
+      "properties": {
+        "hatIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/HatId" }
+        }
+      }
+    },
+
+    "Result_Members": {
+      "type": "object",
+      "required": ["hatIds"],
+      "additionalProperties": false,
+      "properties": {
+        "hatIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/HatId" }
+        }
+      }
+    },
+
+    "Result_HatAdvertisedColor": {
+      "type": "object",
+      "required": ["value"],
+      "additionalProperties": false,
+      "properties": {
+        "value": { "$ref": "#/$defs/HatAdvertisedColor" }
+      }
+    },
+
+    "EventRecord": {
+      "type": "object",
+      "required": ["tick", "type"],
+      "additionalProperties": true,
+      "properties": {
+        "tick": { "$ref": "#/$defs/Tick" },
+        "type": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "location": {
+          "anyOf": [
+            { "$ref": "#/$defs/Location" },
+            { "type": "null" }
+          ]
+        },
+        "beaconId": {
+          "anyOf": [
+            { "$ref": "#/$defs/BeaconId" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+
+    "Result_EventsHistory": {
+      "type": "object",
+      "required": ["events"],
+      "additionalProperties": false,
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EventRecord" }
+        }
+      }
+    },
+
+    "Result_ClearEventsHistory": {
+      "type": "object",
+      "required": ["cleared"],
+      "additionalProperties": false,
+      "properties": {
+        "cleared": { "type": "boolean" }
+      }
+    },
+
+    "Result_ArrestedHats": {
+      "type": "object",
+      "required": ["hatIds"],
+      "additionalProperties": false,
+      "properties": {
+        "hatIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/HatId" }
+        }
+      }
+    },
+
+    "Result_LastLocation": {
+      "type": "object",
+      "required": ["location"],
+      "additionalProperties": false,
+      "properties": {
+        "location": {
+          "anyOf": [
+            { "$ref": "#/$defs/Location" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+
+    "Result_Capabilities": {
+      "type": "object",
+      "required": ["capabilities"],
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/CapabilityId" }
+        }
+      }
+    },
+
+    "Result_MeetingTimes": {
+      "type": "object",
+      "required": ["ticks"],
+      "additionalProperties": false,
+      "properties": {
+        "ticks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Tick" }
+        }
+      }
+    },
+
+    "Result_MeetingLocation": {
+      "type": "object",
+      "required": ["location"],
+      "additionalProperties": false,
+      "properties": {
+        "location": {
+          "anyOf": [
+            { "$ref": "#/$defs/Location" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+
+    "Result_MeetingParticipants": {
+      "type": "object",
+      "required": ["hatIds"],
+      "additionalProperties": false,
+      "properties": {
+        "hatIds": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": { "$ref": "#/$defs/HatId" }
+            },
+            { "type": "null" }
+          ],
+          "description": "Null corresponds to 'nil' (no meeting) in the reference interface."
+        }
+      }
+    },
+
+    "TradeRecord": {
+      "type": "object",
+      "required": ["sourceHatId", "recipientHatId", "capabilityId"],
+      "additionalProperties": false,
+      "properties": {
+        "sourceHatId": { "$ref": "#/$defs/HatId" },
+        "recipientHatId": { "$ref": "#/$defs/HatId" },
+        "capabilityId": { "$ref": "#/$defs/CapabilityId" }
+      }
+    },
+
+    "Result_MeetingTrades": {
+      "type": "object",
+      "required": ["trades"],
+      "additionalProperties": false,
+      "properties": {
+        "trades": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": { "$ref": "#/$defs/TradeRecord" }
+            },
+            { "type": "null" }
+          ],
+          "description": "Null corresponds to 'nil' (no meeting) in the reference interface."
+        }
+      }
+    },
+
+    "Method_WorldDimensions": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_FreeUnlimited" },
+            "args": { "$ref": "#/$defs/Args_None" },
+            "result": { "$ref": "#/$defs/Result_WorldDimensions" }
+          }
+        }
+      ]
+    },
+
+    "Method_Beacons": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_FreeOncePerTick" },
+            "args": { "$ref": "#/$defs/Args_None" },
+            "result": { "$ref": "#/$defs/Result_Beacons" }
+          }
+        }
+      ]
+    },
+
+    "Method_AllCapabilities": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_FreeUnlimited" },
+            "args": { "$ref": "#/$defs/Args_None" },
+            "result": { "$ref": "#/$defs/Result_AllCapabilities" }
+          }
+        }
+      ]
+    },
+
+    "Method_BenignOrganizations": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_FreeUnlimited" },
+            "args": { "$ref": "#/$defs/Args_None" },
+            "result": { "$ref": "#/$defs/Result_Organizations" }
+          }
+        }
+      ]
+    },
+
+    "Method_TerroristOrganizations": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_FreeUnlimited" },
+            "args": { "$ref": "#/$defs/Args_None" },
+            "result": { "$ref": "#/$defs/Result_Organizations" }
+          }
+        }
+      ]
+    },
+
+    "Method_KnownTerroristHats": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_FreeUnlimited" },
+            "args": { "$ref": "#/$defs/Args_None" },
+            "result": { "$ref": "#/$defs/Result_HatIds" }
+          }
+        }
+      ]
+    },
+
+    "Method_Members": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_FreeUnlimited" },
+            "args": { "$ref": "#/$defs/Args_Members" },
+            "result": { "$ref": "#/$defs/Result_Members" }
+          }
+        }
+      ]
+    },
+
+    "Method_HatAdvertisedColor": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_FreeUnlimited" },
+            "args": { "$ref": "#/$defs/Args_HatId" },
+            "result": { "$ref": "#/$defs/Result_HatAdvertisedColor" }
+          }
+        }
+      ]
+    },
+
+    "Method_EventsHistory": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_FreeUnlimited" },
+            "args": { "$ref": "#/$defs/Args_None" },
+            "result": { "$ref": "#/$defs/Result_EventsHistory" }
+          }
+        }
+      ]
+    },
+
+    "Method_ClearEventsHistory": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_FreeUnlimited" },
+            "args": { "$ref": "#/$defs/Args_None" },
+            "result": { "$ref": "#/$defs/Result_ClearEventsHistory" }
+          }
+        }
+      ]
+    },
+
+    "Method_ArrestedHats": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_FreeUnlimited" },
+            "args": { "$ref": "#/$defs/Args_None" },
+            "result": { "$ref": "#/$defs/Result_ArrestedHats" }
+          }
+        }
+      ]
+    },
+
+    "Method_LastLocation": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_PaidOncePerTick" },
+            "args": { "$ref": "#/$defs/Args_HatId_Payment" },
+            "result": { "$ref": "#/$defs/Result_LastLocation" }
+          }
+        }
+      ]
+    },
+
+    "Method_Capabilities": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_PaidOncePerTick" },
+            "args": { "$ref": "#/$defs/Args_HatId_Payment" },
+            "result": { "$ref": "#/$defs/Result_Capabilities" }
+          }
+        }
+      ]
+    },
+
+    "Method_MeetingTimes": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_PaidOncePerTick" },
+            "args": { "$ref": "#/$defs/Args_HatId_Payment" },
+            "result": { "$ref": "#/$defs/Result_MeetingTimes" }
+          }
+        }
+      ]
+    },
+
+    "Method_MeetingLocation": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_PaidOncePerTick" },
+            "args": { "$ref": "#/$defs/Args_HatId_Tick_Payment" },
+            "result": { "$ref": "#/$defs/Result_MeetingLocation" }
+          }
+        }
+      ]
+    },
+
+    "Method_MeetingParticipants": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_PaidOncePerTick" },
+            "args": { "$ref": "#/$defs/Args_Tick_Location_Payment" },
+            "result": { "$ref": "#/$defs/Result_MeetingParticipants" }
+          }
+        }
+      ]
+    },
+
+    "Method_MeetingTrades": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_PaidOncePerTick" },
+            "args": { "$ref": "#/$defs/Args_Tick_Location_Payment" },
+            "result": { "$ref": "#/$defs/Result_MeetingTrades" }
+          }
+        }
+      ]
+    }
+  }
+}

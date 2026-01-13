@@ -1,0 +1,8 @@
+{
+  "contractVersion": "1.0.0",
+  "ok": true,
+  "requestId": "req-01-defaults-add",
+  "payload": {
+    "totalDefaults": 2
+  }
+}

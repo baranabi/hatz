@@ -1,0 +1,14 @@
+{
+  "contractVersion": "1.0.0",
+  "type": "broker.call",
+  "requestId": "req-05-broker-last-location",
+  "payload": {
+    "runId": "run-12345-1",
+    "analystId": "human",
+    "method": "ib.last_location",
+    "args": {
+      "hatId": 42,
+      "payment": 10.0
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "contractVersion": "1.0.0",
+  "type": "sim.end",
+  "requestId": "req-09-end",
+  "payload": {
+    "runId": "run-12345-1"
+  }
+}

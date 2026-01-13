@@ -1,0 +1,10 @@
+{
+  "contractVersion": "1.0.0",
+  "ok": true,
+  "requestId": "req-09-end",
+  "payload": {
+    "runId": "__ANY__",
+    "finalTick": "__ANY__",
+    "summary": {}
+  }
+}

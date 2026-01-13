@@ -1,0 +1,19 @@
+{
+  "contractVersion": "1.0.0",
+  "type": "defaults.add",
+  "requestId": "req-01-defaults-add",
+  "payload": {
+    "runId": "run-12345-1",
+    "analystId": "human",
+    "requests": [
+      {
+        "method": "ib.beacons",
+        "args": {}
+      },
+      {
+        "method": "ib.events_history",
+        "args": {}
+      }
+    ]
+  }
+}

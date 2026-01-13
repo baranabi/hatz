@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hats.contract/v1/protocol",
+  "title": "Hats Contract Protocol (v1)",
+  "type": "object",
+  "$defs": {
+    "ContractVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+
+    "RequestId": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128
+    },
+
+    "RunId": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128
+    },
+
+    "AnalystId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+
+    "Tick": {
+      "type": "integer",
+      "minimum": 0
+    },
+
+    "HatId": {
+      "type": "integer",
+      "minimum": 0
+    },
+
+    "BeaconId": {
+      "type": "integer",
+      "minimum": 0
+    },
+
+    "OrganizationId": {
+      "type": "integer",
+      "minimum": 0
+    },
+
+    "CapabilityId": {
+      "type": "integer",
+      "minimum": 0
+    },
+
+    "Payment": {
+      "type": "number",
+      "minimum": 0
+    },
+
+    "Location": {
+      "type": "object",
+      "required": ["x", "y"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "integer" },
+        "y": { "type": "integer" }
+      }
+    },
+
+    "AlertLevel": {
+      "type": "string",
+      "enum": ["OFF", "LEVEL_ONE", "LEVEL_TWO"]
+    },
+
+    "ArrestStatus": {
+      "type": "string",
+      "enum": ["SUCCESSFUL", "FAILURE"]
+    },
+
+    "HatAdvertisedColor": {
+      "type": "string",
+      "enum": ["TERRORIST", "UNKNOWN", "NOT_A_KNOWN_HAT"]
+    },
+
+    "RequestFrequency": {
+      "type": "string",
+      "enum": ["ONCE_EVER", "ONCE_PER_TICK", "UNLIMITED"]
+    },
+
+    "Error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "code": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "details": {}
+      }
+    },
+
+    "EnvelopeRequest": {
+      "type": "object",
+      "required": ["contractVersion", "type", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": { "$ref": "#/$defs/ContractVersion" },
+        "type": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "payload": {},
+        "requestId": { "$ref": "#/$defs/RequestId" }
+      }
+    },
+
+    "EnvelopeResponse": {
+      "type": "object",
+      "required": ["contractVersion", "ok"],
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": { "$ref": "#/$defs/ContractVersion" },
+        "ok": { "type": "boolean" },
+        "payload": {},
+        "error": { "$ref": "#/$defs/Error" },
+        "requestId": { "$ref": "#/$defs/RequestId" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "ok": { "const": true } }, "required": ["ok"] },
+          "then": { "required": ["payload"] }
+        },
+        {
+          "if": { "properties": { "ok": { "const": false } }, "required": ["ok"] },
+          "then": { "required": ["error"] }
+        }
+      ]
+    },
+
+    "DefaultIbRequest": {
+      "type": "object",
+      "required": ["method", "args"],
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "type": "string",
+          "pattern": "^ib\\.[a-z0-9_]+$"
+        },
+        "args": { "type": "object" }
+      }
+    },
+
+    "DefaultIbResult": {
+      "type": "object",
+      "required": ["method", "result"],
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "type": "string",
+          "pattern": "^ib\\.[a-z0-9_]+$"
+        },
+        "result": {},
+        "metadata": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tick": { "$ref": "#/$defs/Tick" },
+            "noisy": { "type": "boolean" },
+            "charged": { "$ref": "#/$defs/Payment" }
+          }
+        }
+      }
+    }
+  }
+}

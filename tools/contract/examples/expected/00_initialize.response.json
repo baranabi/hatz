@@ -1,0 +1,9 @@
+{
+  "contractVersion": "1.0.0",
+  "ok": true,
+  "requestId": "req-00-initialize",
+  "payload": {
+    "runId": "__ANY__",
+    "startedAtTick": "__ANY__"
+  }
+}
