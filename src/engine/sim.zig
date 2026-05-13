@@ -215,7 +215,7 @@ pub fn advance(registry: *runs.Runs, allocator: std.mem.Allocator, payload: SimA
 /// The run is not removed from the registry in the stub implementation.
 pub fn end(registry: *runs.Runs, allocator: std.mem.Allocator, payload: SimEndRequestPayload) !SimEndResponsePayload {
     const run = registry.get(payload.runId) orelse return error.RunNotFound;
-    const summary = std.json.Value{ .object = std.json.ObjectMap.init(allocator) };
+    const summary = std.json.Value{ .object = try std.json.ObjectMap.init(allocator, &.{}, &.{}) };
     return SimEndResponsePayload{
         .runId = run.run_id,
         .finalTick = run.tick,
