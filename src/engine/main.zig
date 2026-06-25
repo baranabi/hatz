@@ -17,14 +17,14 @@ pub fn main() !void {
 /// Execute a small end-to-end demo of the engine APIs.
 /// This exercises initialize, defaults, advance, broker calls, and actions.
 pub fn runDemo() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     var registry = runs.Runs.init(allocator);
     defer registry.deinit();
 
-    const params_value = std.json.Value{ .object = std.json.ObjectMap.init(allocator) };
+    const params_value = std.json.Value{ .object = try std.json.ObjectMap.init(allocator, &.{}, &.{}) };
     const init_payload = sim.SimInitializeRequestPayload{
         .seed = 1234,
         .params = params_value,
@@ -33,7 +33,7 @@ pub fn runDemo() !void {
     try printJson(init_resp);
 
     const run = registry.get(init_resp.runId).?;
-    const empty_args = std.json.Value{ .object = std.json.ObjectMap.init(allocator) };
+    const empty_args = std.json.Value{ .object = try std.json.ObjectMap.init(allocator, &.{}, &.{}) };
     const default_requests = [_]protocol.DefaultIbRequest{
         .{ .method = "ib.beacons", .args = empty_args },
     };
@@ -94,9 +94,9 @@ pub fn runDemo() !void {
 /// Build a JSON object value from key/value pairs.
 /// This is a small helper for constructing broker args.
 fn jsonObject(allocator: std.mem.Allocator, fields: []const struct { key: []const u8, value: std.json.Value }) !std.json.Value {
-    var obj = std.json.ObjectMap.init(allocator);
+    var obj = try std.json.ObjectMap.init(allocator, &.{}, &.{});
     for (fields) |field| {
-        try obj.put(field.key, field.value);
+        try obj.put(allocator, field.key, field.value);
     }
     return std.json.Value{ .object = obj };
 }
@@ -105,6 +105,5 @@ fn jsonObject(allocator: std.mem.Allocator, fields: []const struct { key: []cons
 fn printJson(value: anytype) !void {
     const json_text = try json_util.stringifyAlloc(std.heap.page_allocator, value);
     defer std.heap.page_allocator.free(json_text);
-    try std.fs.File.stdout().writeAll(json_text);
-    try std.fs.File.stdout().writeAll("\n");
+    std.debug.print("{s}\n", .{json_text});
 }

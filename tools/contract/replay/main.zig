@@ -1,4 +1,3 @@
-//! Replay contract fixtures through the in-process engine router.
 const std = @import("std");
 const engine = @import("engine");
 
@@ -7,46 +6,48 @@ const expected_dir = "tools/contract/examples/expected";
 const output_dir = "tools/contract/examples/output";
 const max_json_size = 1024 * 1024;
 
-/// CLI entrypoint for replaying contract fixtures.
-/// Runs in-order, writes responses to stdout and output files, and can check expectations.
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
+    const io = init.io;
+    const arena = init.arena;
+    const cwd = std.Io.Dir.cwd();
 
     var check = false;
-    if (args.len == 2) {
-        if (!std.mem.eql(u8, args[1], "--check")) return error.InvalidArgs;
-        check = true;
-    } else if (args.len > 2) {
-        return error.InvalidArgs;
+    {
+        var args_it = std.process.Args.Iterator.init(init.minimal.args);
+        _ = args_it.next();
+        if (args_it.next()) |arg| {
+            if (!std.mem.eql(u8, arg, "--check")) return error.InvalidArgs;
+            check = true;
+            if (args_it.next() != null) return error.InvalidArgs;
+        }
     }
 
     var registry = engine.runs.Runs.init(allocator);
     defer registry.deinit();
 
-    var names = try collectRequestFiles(allocator, examples_dir);
+    var names = try collectRequestFiles(allocator, io, cwd, examples_dir);
     defer {
         for (names.items) |name| allocator.free(name);
         names.deinit(allocator);
     }
     if (names.items.len == 0) return error.NoRequestsFound;
 
-    try std.fs.cwd().makePath(output_dir);
+    {
+        const rc = std.os.linux.mkdir(output_dir, 0o755);
+        _ = rc;
+    }
+
+    var stdout_buf: [4096]u8 = undefined;
+    var stdout_file = std.Io.File.Writer.init(std.Io.File.stdout(), io, &stdout_buf);
 
     for (names.items) |name| {
-        var arena = std.heap.ArenaAllocator.init(allocator);
-        defer arena.deinit();
         const arena_alloc = arena.allocator();
 
         const request_path = try joinPath(arena_alloc, &.{ examples_dir, name });
-        const request_json = try std.fs.cwd().readFileAlloc(arena_alloc, request_path, max_json_size);
+        const request_json = try cwd.readFileAlloc(io, request_path, arena_alloc, .limited(max_json_size));
 
-        const parsed = try std.json.parseFromSlice(engine.protocol.EnvelopeRequest, arena_alloc, request_json, .{ .allocate = .alloc_always });
-        const request = parsed.value;
+        const request = try std.json.parseFromSliceLeaky(engine.protocol.EnvelopeRequest, arena_alloc, request_json, .{ .allocate = .alloc_always });
 
         const response = engine.router.dispatch(&registry, arena_alloc, request) catch |err| {
             std.debug.print("Failed to dispatch {s}: {s}\n", .{ name, @errorName(err) });
@@ -54,27 +55,29 @@ pub fn main() !void {
         };
 
         const response_json = try stringifyAlloc(arena_alloc, response);
-        try std.fs.File.stdout().writeAll(response_json);
-        try std.fs.File.stdout().writeAll("\n");
+        try stdout_file.interface.writeAll(response_json);
+        try stdout_file.interface.writeAll("\n");
 
         const output_name = try replaceSuffix(arena_alloc, name, ".json", ".response.json");
         const output_path = try joinPath(arena_alloc, &.{ output_dir, output_name });
         {
-            const out_file = try std.fs.cwd().createFile(output_path, .{ .truncate = true });
-            defer out_file.close();
-            try out_file.writeAll(response_json);
+            const out_file = try cwd.createFile(io, output_path, .{});
+            defer out_file.close(io);
+            var out_buf: [4096]u8 = undefined;
+            var out_writer = std.Io.File.Writer.init(out_file, io, &out_buf);
+            try out_writer.interface.writeAll(response_json);
         }
 
         if (check) {
             const expected_name = output_name;
             const expected_path = try joinPath(arena_alloc, &.{ expected_dir, expected_name });
-            const expected_json = std.fs.cwd().readFileAlloc(arena_alloc, expected_path, max_json_size) catch |err| {
+            const expected_json = cwd.readFileAlloc(io, expected_path, arena_alloc, .limited(max_json_size)) catch |err| {
                 std.debug.print("Missing expected response for {s}: {s}\n", .{ name, @errorName(err) });
                 return err;
             };
-            const expected_value = try std.json.parseFromSlice(std.json.Value, arena_alloc, expected_json, .{ .allocate = .alloc_always });
-            const actual_value = try std.json.parseFromSlice(std.json.Value, arena_alloc, response_json, .{ .allocate = .alloc_always });
-            if (compareResponse(arena_alloc, expected_value.value, actual_value.value)) |mismatch| {
+            const expected_value = try std.json.parseFromSliceLeaky(std.json.Value, arena_alloc, expected_json, .{ .allocate = .alloc_always });
+            const actual_value = try std.json.parseFromSliceLeaky(std.json.Value, arena_alloc, response_json, .{ .allocate = .alloc_always });
+            if (compareResponse(arena_alloc, expected_value, actual_value)) |mismatch| {
                 std.debug.print("Mismatch in {s}: {s} expected {s}, got {s}\n", .{ name, mismatch.path, mismatch.expected, mismatch.actual });
                 return error.CheckFailed;
             }
@@ -82,14 +85,12 @@ pub fn main() !void {
     }
 }
 
-/// Collect request fixture filenames in lexical order.
-/// Response files are ignored to avoid replaying generated artifacts.
-fn collectRequestFiles(allocator: std.mem.Allocator, dir_path: []const u8) !std.ArrayList([]const u8) {
+fn collectRequestFiles(allocator: std.mem.Allocator, io: std.Io, dir_cwd: std.Io.Dir, dir_path: []const u8) !std.ArrayList([]const u8) {
     var list: std.ArrayList([]const u8) = .empty;
-    var dir = try std.fs.cwd().openDir(dir_path, .{ .iterate = true });
-    defer dir.close();
-    var it = dir.iterate();
-    while (try it.next()) |entry| {
+    var dir = try dir_cwd.openDir(io, dir_path, .{ .iterate = true });
+    defer dir.close(io);
+    var it = dir.iterateAssumeFirstIteration();
+    while (try it.next(io)) |entry| {
         if (entry.kind != .file) continue;
         if (!std.mem.endsWith(u8, entry.name, ".json")) continue;
         if (std.mem.endsWith(u8, entry.name, ".response.json")) continue;
@@ -99,8 +100,6 @@ fn collectRequestFiles(allocator: std.mem.Allocator, dir_path: []const u8) !std.
     return list;
 }
 
-/// Sort strings in-place using a simple insertion sort.
-/// The list is small, so avoiding allocations keeps this cheap and predictable.
 fn sortLex(items: [][]const u8) void {
     if (items.len < 2) return;
     var i: usize = 1;
@@ -114,21 +113,18 @@ fn sortLex(items: [][]const u8) void {
     }
 }
 
-/// Replace a file suffix with a new suffix, returning a newly allocated string.
 fn replaceSuffix(allocator: std.mem.Allocator, value: []const u8, suffix: []const u8, replacement: []const u8) ![]const u8 {
     if (!std.mem.endsWith(u8, value, suffix)) return error.InvalidSuffix;
     const prefix_len = value.len - suffix.len;
     return std.fmt.allocPrint(allocator, "{s}{s}", .{ value[0..prefix_len], replacement });
 }
 
-/// Join path segments using the platform separator.
 fn joinPath(allocator: std.mem.Allocator, parts: []const []const u8) ![]const u8 {
     return std.fs.path.join(allocator, parts);
 }
 
-/// Serialize a value to JSON and return an owned byte slice.
 fn stringifyAlloc(allocator: std.mem.Allocator, value: anytype) ![]u8 {
-    var out: std.io.Writer.Allocating = .init(allocator);
+    var out: std.Io.Writer.Allocating = .init(allocator);
     errdefer out.deinit();
     try std.json.Stringify.value(value, .{}, &out.writer);
     return out.toOwnedSlice();
@@ -140,8 +136,6 @@ const Mismatch = struct {
     actual: []const u8,
 };
 
-/// Compare envelope responses, enforcing contractVersion/ok and expected payload keys.
-/// Returns a mismatch structure with a path and formatted values on failure.
 fn compareResponse(allocator: std.mem.Allocator, expected: std.json.Value, actual: std.json.Value) ?Mismatch {
     if (expected != .object or actual != .object) {
         return mismatchValue(allocator, "$", expected, actual);
@@ -176,8 +170,6 @@ fn compareResponse(allocator: std.mem.Allocator, expected: std.json.Value, actua
     return null;
 }
 
-/// Recursively compare JSON values with support for "__ANY__" wildcards.
-/// Expected objects act as a subset: any missing expected key is a mismatch.
 fn compareValue(allocator: std.mem.Allocator, expected: std.json.Value, actual: std.json.Value, path: []const u8) ?Mismatch {
     if (expected == .string and std.mem.eql(u8, expected.string, "__ANY__")) return null;
     switch (expected) {
@@ -241,7 +233,6 @@ fn compareValue(allocator: std.mem.Allocator, expected: std.json.Value, actual: 
     return null;
 }
 
-/// Build a mismatch record with JSON-encoded expected and actual values.
 fn mismatchValue(allocator: std.mem.Allocator, path: []const u8, expected: std.json.Value, actual: std.json.Value) ?Mismatch {
     const expected_text = stringifyAlloc(allocator, expected) catch return null;
     const actual_text = stringifyAlloc(allocator, actual) catch return null;
