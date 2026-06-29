@@ -13,7 +13,7 @@ const json_util = @import("json_util.zig");
 pub fn dispatch(registry: *runs.Runs, allocator: std.mem.Allocator, request: protocol.EnvelopeRequest) !protocol.EnvelopeResponse {
     if (std.mem.eql(u8, request.type, "sim.initialize")) {
         const payload = try parsePayload(sim.SimInitializeRequestPayload, allocator, request.payload);
-        const response = try sim.initialize(registry, registry.allocator, payload);
+        const response = try sim.initialize(registry, payload);
         return okResponse(allocator, request, response);
     }
     if (std.mem.eql(u8, request.type, "sim.advance")) {
@@ -73,14 +73,19 @@ pub fn dispatch(registry: *runs.Runs, allocator: std.mem.Allocator, request: pro
 
 /// Convert a dynamic JSON value into a typed payload by re-stringifying.
 /// This avoids re-implementing JSON decoding for every message shape.
-fn parsePayload(comptime T: type, allocator: std.mem.Allocator, value: std.json.Value) !T {
+pub fn parsePayload(comptime T: type, allocator: std.mem.Allocator, value: std.json.Value) !T {
     const json_text = try json_util.stringifyAlloc(allocator, value);
     const parsed = try std.json.parseFromSlice(T, allocator, json_text, .{ .allocate = .alloc_always });
     return parsed.value;
 }
 
-/// Wrap a typed payload into a success EnvelopeResponse.
+/// Wrap a typed payload into a success EnvelopeResponse value.
 /// The requestId is preserved for end-to-end correlation.
+pub fn okResponseValue(allocator: std.mem.Allocator, request: protocol.EnvelopeRequest, payload: anytype) !std.json.Value {
+    const payload_value = try valueFromStruct(allocator, payload);
+    return std.json.Value{ .object = try okResponseObject(allocator, request, payload_value) };
+}
+
 fn okResponse(allocator: std.mem.Allocator, request: protocol.EnvelopeRequest, payload: anytype) !protocol.EnvelopeResponse {
     const payload_value = try valueFromStruct(allocator, payload);
     return protocol.EnvelopeResponse{
@@ -92,9 +97,20 @@ fn okResponse(allocator: std.mem.Allocator, request: protocol.EnvelopeRequest, p
     };
 }
 
+fn okResponseObject(allocator: std.mem.Allocator, request: protocol.EnvelopeRequest, payload_value: std.json.Value) !std.json.ObjectMap {
+    var obj = try std.json.ObjectMap.init(allocator, &.{}, &.{});
+    try obj.put(allocator, "contractVersion", std.json.Value{ .string = request.contractVersion });
+    try obj.put(allocator, "ok", std.json.Value{ .bool = true });
+    try obj.put(allocator, "payload", payload_value);
+    if (request.requestId) |rid| {
+        try obj.put(allocator, "requestId", std.json.Value{ .string = rid });
+    }
+    return obj;
+}
+
 /// Convert a typed response payload into a dynamic JSON value.
 /// This keeps the router independent of schema-specific JSON builders.
-fn valueFromStruct(allocator: std.mem.Allocator, value: anytype) !std.json.Value {
+pub fn valueFromStruct(allocator: std.mem.Allocator, value: anytype) !std.json.Value {
     const json_text = try json_util.stringifyAlloc(allocator, value);
     const parsed = try std.json.parseFromSlice(std.json.Value, allocator, json_text, .{ .allocate = .alloc_always });
     return parsed.value;
