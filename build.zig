@@ -115,12 +115,18 @@ pub fn build(b: *std.Build) void {
     // For a top level step to actually do something, it must depend on other
     // steps (e.g. a Run step, as we will see in a moment).
     // ── WebSocket daemon executable ──────────────────────────────────────
+    // ponytail: src/daemon.zig + src/main_daemon.zig use std.c.{close,poll,write},
+    // which are libc symbols. Zig 0.16 requires explicit `link_libc = true`
+    // on Linux toolchains; macOS auto-links libc but the flag is a harmless no-op.
+    // Without this, the Linux CI runner (contract-replay.yml) fails with
+    // "dependency on libc must be explicitly specified in the build command".
     const daemon_exe = b.addExecutable(.{
         .name = "hatz-daemon",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main_daemon.zig"),
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
             .imports = &.{
                 .{ .name = "engine", .module = engine },
             },
