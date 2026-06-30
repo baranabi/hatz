@@ -10,6 +10,7 @@ const meetings = @import("meetings.zig");
 const planner = @import("planner.zig");
 const actions = @import("actions.zig");
 const json_util = @import("json_util.zig");
+const movement = @import("movement.zig");
 
 /// High-level simulation parameters with sensible defaults.
 /// These control population generation, world geometry, and simulation behaviour.
@@ -347,9 +348,12 @@ pub fn advance(registry: *runs.Runs, allocator: std.mem.Allocator, payload: SimA
     const events_before = run.event_log.items.len;
     while (tick <= to_tick) : (tick += 1) {
         for (run.hat_states, run.hats) |*hs, hat| {
-            // Default: update to deterministic location for this tick.
-            // Future: interpolate toward meeting location when meetings exist.
-            hs.current_location = types.deterministicLocation(run.seed, tick, hat.id);
+            // Stepwise movement: hat moves at most 1 cell per tick.
+            hs.current_location = movement.updateLocation(
+                run.seed, tick, hat.id, hs.current_location,
+                run.params.grid_x_min, run.params.grid_x_max,
+                run.params.grid_y_min, run.params.grid_y_max,
+            );
         }
         // Run organization planner each tick (only effective on planning_interval ticks).
         try planner.plan(run.allocator, run.seed, run.params.planning_interval, tick, run.organizations, run.beacons[0..], &run.taskforces, &run.event_log);
@@ -750,6 +754,57 @@ test "beacon vulnerabilities for seed=42 are all in [0, 15]" {
             try std.testing.expect(types.hasCapability(0xFFFF, vuln));
         }
     }
+}
+
+test "planner taskforce_created events match beacon locations (seed=42, 100 ticks)" {
+    // This test verifies the planner targets match broker beacon locations.
+    // If this fails, the planner is selecting beacon indices that don't match
+    // the broker's beacon array order.
+    const allocator = std.testing.allocator;
+
+    var params = std.json.ObjectMap{};
+    try params.put(allocator, "n_hats", std.json.Value{ .integer = 200 });
+    try params.put(allocator, "n_benign_orgs", std.json.Value{ .integer = 3 });
+    try params.put(allocator, "n_terrorist_orgs", std.json.Value{ .integer = 2 });
+    try params.put(allocator, "planning_interval", std.json.Value{ .integer = 10 });
+    var tr = try initTestRunWithParams(allocator, params);
+    defer tr.registry.deinit();
+
+    const run = tr.run;
+
+    // Advance 100 ticks like the reproducer script.
+    _ = try advance(tr.registry, allocator, .{
+        .runId = tr.run_id,
+        .numberOfTicks = 100,
+        .includeDefaultRequestResults = false,
+    });
+
+    // Collect beacon locations.
+    var beacon_locs: [beacon_count]types.Location = undefined;
+    for (run.beacons, 0..) |b, i| {
+        beacon_locs[i] = b.location;
+    }
+
+    // Check taskforce_created events for beacon-matching targets.
+    // This directly validates the acceptance criteria:
+    // "at least one taskforce_created event has a target that matches
+    //  one of the 5 broker-reported beacon locations."
+    var event_match_count: usize = 0;
+    for (run.event_log.items) |ev| {
+        if (std.mem.eql(u8, ev.type, "taskforce_created")) {
+            if (ev.location) |loc| {
+                for (beacon_locs) |bl| {
+                    if (loc.x == bl.x and loc.y == bl.y) {
+                        event_match_count += 1;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // At least one taskforce_created event must have a target matching a beacon.
+    try std.testing.expect(event_match_count >= 1);
 }
 
 test "advance with 0 ticks does not change state" {

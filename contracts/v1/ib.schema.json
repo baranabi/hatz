@@ -28,6 +28,7 @@
         "ib.known_terrorist_hats": { "$ref": "#/$defs/Method_KnownTerroristHats" },
         "ib.members": { "$ref": "#/$defs/Method_Members" },
         "ib.hat_advertised_color": { "$ref": "#/$defs/Method_HatAdvertisedColor" },
+        "ib.hat_locations": { "$ref": "#/$defs/Method_HatLocations" },
         "ib.events_history": { "$ref": "#/$defs/Method_EventsHistory" },
         "ib.clear_events_history": { "$ref": "#/$defs/Method_ClearEventsHistory" },
         "ib.arrested_hats": { "$ref": "#/$defs/Method_ArrestedHats" },
@@ -103,6 +104,7 @@
             "ib.known_terrorist_hats",
             "ib.members",
             "ib.hat_advertised_color",
+            "ib.hat_locations",
             "ib.events_history",
             "ib.clear_events_history",
             "ib.arrested_hats",
@@ -693,6 +695,18 @@
             "meta": { "$ref": "#/$defs/MethodMeta_PaidOncePerTick" },
             "args": { "$ref": "#/$defs/Args_Tick_Location_Payment" },
             "result": { "$ref": "#/$defs/Result_MeetingTrades" }
+          }
+        }
+      ]
+    },
+    "Method_HatLocations": {
+      "allOf": [
+        { "$ref": "#/$defs/MethodEnvelope" },
+        {
+          "properties": {
+            "meta": { "$ref": "#/$defs/MethodMeta_PaidOncePerTick" },
+            "args": { "$ref": "#/$defs/Args_HatId_Payment" },
+            "result": { "$ref": "#/$defs/Result_LastLocation" }
           }
         }
       ]

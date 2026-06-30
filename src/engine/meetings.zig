@@ -284,6 +284,180 @@ test "terrorist final meeting at beacon emits attack event" {
     try std.testing.expect(found_attack);
 }
 
+test "multi-meeting capability trade enables beacon attack at final meeting" {
+    const allocator = std.testing.allocator;
+
+    // ── Setup ───────────────────────────────────────────────────────────
+    // 3 hats, 1 TERRORIST org, 1 taskforce with 2 meetings spanning ticks.
+    // Beacon 0 vulnerabilities = {2, 2, 2} (only cap 2 required).
+    //
+    // Initial capabilities:
+    //   Hat 0: cap 0 only
+    //   Hat 1: cap 2 only
+    //   Hat 2: none
+    //
+    // Meeting 1 (tick 10, intermediate): trade cap 2 from hat 1 → hat 0
+    // Meeting 2 (tick 20, at beacon 0, final): participants {0, 1}
+    //
+    // If cap-tracking works: after meeting 1, hat 0 has {0, 2}, hat 1 has {}.
+    // At meeting 2, combined_bits = hat0{0,2} | hat1{} = {0,2} ⊇ {2} → attack.
+
+    const n_hats: usize = 3;
+    const hats = try allocator.alloc(types.Hat, n_hats);
+    for (hats, 0..) |*hat, i| {
+        hat.* = .{ .id = @intCast(i), .true_color = .TERRORIST, .advertised_color = .UNKNOWN };
+    }
+
+    const hat_states = try allocator.alloc(types.HatState, n_hats);
+    hat_states[0] = .{ .current_location = .{ .x = 0, .y = 0 }, .capability_bits = (1 << 0) }; // cap 0
+    hat_states[1] = .{ .current_location = .{ .x = 0, .y = 0 }, .capability_bits = (1 << 2) }; // cap 2
+    hat_states[2] = .{ .current_location = .{ .x = 0, .y = 0 }, .capability_bits = 0 };
+
+    const n_orgs: usize = 1;
+    const orgs = try allocator.alloc(types.Organization, n_orgs);
+    orgs[0] = .{ .id = 0, .org_type = .TERRORIST, .members = try allocator.dupe(types.HatId, &.{ 0, 1, 2 }) };
+
+    const beacon_count = sim.beacon_count;
+    var beacons: [beacon_count]types.Beacon = undefined;
+    var beacon_vulns: [beacon_count][3]types.CapabilityId = undefined;
+    for (&beacons, 0..) |*b, i| {
+        beacon_vulns[i] = .{ 2, 2, 2 }; // only vuln is cap 2
+        b.* = .{
+            .beaconId = @intCast(i),
+            .alertLevel = .OFF,
+            .location = .{ .x = @intCast(10 + i * 20), .y = 10 },
+        };
+    }
+    const beacon0_loc = beacons[0].location;
+
+    // Meeting 1 at tick 10: trade cap 2 from hat 1 → hat 0.
+    const trades1 = try allocator.alloc(types.CapabilityTrade, 1);
+    trades1[0] = .{ .source_hat_id = 1, .recipient_hat_id = 0, .capability_id = 2 };
+
+    const p0 = try allocator.dupe(types.HatId, &.{ 0, 1 });
+    const m1 = types.Meeting{
+        .tick = 10,
+        .location = .{ .x = 5, .y = 5 },
+        .participants = p0,
+        .trades = trades1,
+    };
+
+    // Meeting 2 at tick 20, at beacon 0, final/root meeting.
+    const p1 = try allocator.dupe(types.HatId, &.{ 0, 1 });
+    const m2 = types.Meeting{
+        .tick = 20,
+        .location = beacon0_loc,
+        .participants = p1,
+        .trades = &.{},
+    };
+
+    const mp = try allocator.alloc(types.Meeting, 2);
+    mp[0] = m1;
+    mp[1] = m2;
+
+    var taskforces = std.ArrayList(types.Taskforce).empty;
+    try taskforces.append(allocator, types.Taskforce{
+        .id = 0,
+        .organization_id = 0,
+        .members = try allocator.dupe(types.HatId, &.{ 0, 1, 2 }),
+        .target = beacon0_loc,
+        .required_capabilities = try allocator.dupe(types.CapabilityId, &.{ 2 }),
+        .meeting_plan = mp,
+        .status = .ACTIVE,
+    });
+
+    var state = sim.RunState{
+        .allocator = allocator,
+        .run_id = try allocator.dupe(u8, "multi-meeting-cap-tracking"),
+        .seed = 42,
+        .tick = 0,
+        .params = sim.SimParams{},
+        .analyst_states = std.StringHashMap(sim.AnalystState).init(allocator),
+        .beacons = beacons,
+        .beacon_vulnerabilities = beacon_vulns,
+        .arrested_hats = std.AutoHashMap(types.HatId, bool).init(allocator),
+        .event_log = .empty,
+        .hat_states = hat_states,
+        .hats = hats,
+        .organizations = orgs,
+        .taskforces = taskforces,
+    };
+    defer {
+        for (state.taskforces.items) |tf| {
+            allocator.free(tf.members);
+            allocator.free(tf.required_capabilities);
+            for (tf.meeting_plan) |m| {
+                allocator.free(m.participants);
+                allocator.free(m.trades);
+            }
+            allocator.free(tf.meeting_plan);
+        }
+        state.taskforces.deinit(allocator);
+        for (state.organizations) |org| allocator.free(org.members);
+        allocator.free(state.organizations);
+        allocator.free(state.hats);
+        allocator.free(state.hat_states);
+        state.event_log.deinit(allocator);
+        state.analyst_states.deinit();
+        state.arrested_hats.deinit();
+        allocator.free(state.run_id);
+    }
+
+    // ── Verify initial state ────────────────────────────────────────────
+    try std.testing.expect(types.hasCapability(state.hat_states[0].capability_bits, 0));
+    try std.testing.expect(!types.hasCapability(state.hat_states[0].capability_bits, 2));
+    try std.testing.expect(types.hasCapability(state.hat_states[1].capability_bits, 2));
+    try std.testing.expect(!types.hasCapability(state.hat_states[2].capability_bits, 2));
+
+    // ── Execute meeting 1 (tick 10) ─────────────────────────────────────
+    try executeMeetings(&state, 10);
+
+    // Taskforce still ACTIVE — intermediate meeting only.
+    try std.testing.expectEqual(.ACTIVE, state.taskforces.items[0].status);
+
+    // Trade event recorded with correct source, recipient, and capability.
+    var trade_event_count: usize = 0;
+    for (state.event_log.items) |ev| {
+        if (std.mem.eql(u8, ev.type, types.event_type_trade)) {
+            trade_event_count += 1;
+            try std.testing.expectEqual(@as(types.HatId, 1), ev.tradeSourceId.?);
+            try std.testing.expectEqual(@as(types.HatId, 0), ev.tradeRecipientId.?);
+            try std.testing.expectEqual(@as(types.CapabilityId, 2), ev.tradeCapabilityId.?);
+            try std.testing.expectEqual(@as(u32, 0), ev.taskforceId.?);
+        }
+    }
+    try std.testing.expectEqual(@as(usize, 1), trade_event_count);
+
+    // Hat states match trade: source lost cap 2, recipient gained it.
+    try std.testing.expect(!types.hasCapability(state.hat_states[1].capability_bits, 2));
+    try std.testing.expect(types.hasCapability(state.hat_states[0].capability_bits, 2));
+    // Hat 0 preserved its original cap 0.
+    try std.testing.expect(types.hasCapability(state.hat_states[0].capability_bits, 0));
+
+    // ── Execute meeting 2 (tick 20, final at beacon) ────────────────────
+    try executeMeetings(&state, 20);
+
+    // Taskforce disbanded after final meeting.
+    try std.testing.expectEqual(.DISBANDED, state.taskforces.items[0].status);
+
+    // Attack detected: combined_caps from current hat_states includes cap 2
+    // that was traded from hat 1 to hat 0 at the intermediate meeting.
+    var found_attack = false;
+    for (state.event_log.items) |ev| {
+        if (std.mem.eql(u8, ev.type, types.event_type_attack)) {
+            found_attack = true;
+            try std.testing.expectEqual(@as(u64, 20), ev.tick);
+            try std.testing.expectEqual(@as(types.BeaconId, 0), ev.beaconId.?);
+            try std.testing.expectEqual(@as(u32, 0), ev.taskforceId.?);
+        }
+    }
+    try std.testing.expect(found_attack);
+
+    // Combined: the trade event at tick 10, the attack event at tick 20,
+    // and the hat state mutation between them prove per-hat capability
+    // tracking persists across meetings.
+}
+
 // ── Test helpers ──────────────────────────────────────────────────────
 
 /// Build a minimal RunState for meeting execution tests.

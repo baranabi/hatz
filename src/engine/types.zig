@@ -82,7 +82,7 @@ pub const Taskforce = struct {
     members: []const HatId,
     target: Location,
     required_capabilities: []const CapabilityId,
-    meeting_plan: []const Meeting,
+    meeting_plan: []Meeting,
     status: TaskforceStatus,
 };
 
@@ -163,6 +163,7 @@ pub const event_type_arrest = "arrest";
 pub const event_type_false_arrest = "false_arrest";
 pub const event_type_alert_change = "alert_change";
 pub const event_type_attack = "beacon_attack";
+pub const event_type_moved = "moved";
 
 /// Bound a 64-bit value into the inclusive range [0, max].
 pub fn bounded(value: u64, max: i32) i32 {

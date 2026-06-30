@@ -128,7 +128,8 @@ test "no attack when meeting location does not match any beacon" {
     defer deinitTestRunState(allocator, &state);
 
     // Move the meeting location far from the beacon.
-    state.taskforces.items[0].meeting_plan[0].location = .{ .x = 99, .y = 99 };
+    var tf0 = &state.taskforces.items[0];
+    tf0.meeting_plan[0].location = .{ .x = 99, .y = 99 };
 
     const attack_detected = try checkBeaconAttack(
         &state, 42,
@@ -166,7 +167,7 @@ test "no attack when capabilities do not cover vulnerabilities" {
     defer deinitTestRunState(allocator, &state);
 
     // Clear all hat capabilities so the vulnerability check fails.
-    for (&state.hat_states) |*hs| {
+    for (state.hat_states) |*hs| {
         hs.capability_bits = 0;
     }
 
@@ -187,7 +188,8 @@ test "attack recorded with correct beacon id when multiple beacons exist" {
 
     // Move the meeting to beacon 2's location.
     const beacon2_loc = state.beacons[2].location;
-    state.taskforces.items[0].meeting_plan[0].location = beacon2_loc;
+    var tf0 = &state.taskforces.items[0];
+    tf0.meeting_plan[0].location = beacon2_loc;
 
     const attack_detected = try checkBeaconAttack(
         &state, 99,

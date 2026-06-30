@@ -6,7 +6,7 @@ const broker = @import("broker.zig");
 const runs = @import("runs.zig");
 
 fn newObject(allocator: std.mem.Allocator) !std.json.ObjectMap {
-    return std.json.ObjectMap.init(allocator);
+    return std.json.ObjectMap.init(allocator, &.{}, &.{});
 }
 
 fn putInt(obj: *std.json.ObjectMap, key: []const u8, value: i64) !void {

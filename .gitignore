@@ -12,6 +12,7 @@ zig-out/
 /test-replay
 /test-*
 /hermes-verify-*
+/minimal_test
 
 # === Build intermediates ===
 *.d
@@ -50,8 +51,26 @@ tools/contract/examples/output/
 
 # === Python ===
 hatz-cli/.venv/
+hatz-cli/__pycache__/
+*.pyc
+*.pyo
 
 # === Backup files ===
 *.bak
 *.backup
 *.orig
+
+# === Ad-hoc verification scripts (per-builder one-off drivers) ===
+# Builders occasionally drop a one-off Zig/Python verify program next to the
+# code they're checking. They have their own build files (build.smoke.zig,
+# hermes-verify.build.zig, tools/verify-build.zig) and aren't referenced
+# by build.zig. Re-create on demand; don't pollute the tree.
+/build.smoke.zig
+/hermes-verify.build.zig
+/src/hermes-verify-*.zig
+/src/verify-*.zig
+/tools/verify-*.zig
+/tools/verify-*.sh
+/tools/coverage.sh
+/tools/hermes-verify-*.sh
+/hatz-cli/check_*.py

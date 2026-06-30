@@ -180,13 +180,6 @@ pub fn build(b: *std.Build) void {
     // A run step that will run the second test executable.
     const run_exe_tests = b.addRunArtifact(exe_tests);
 
-    // A top level step for running all tests. dependOn can be called multiple
-    // times and since the two run steps do not depend on one another, this will
-    // make the two of them run in parallel.
-    const test_step = b.step("test", "Run tests");
-    test_step.dependOn(&run_mod_tests.step);
-    test_step.dependOn(&run_exe_tests.step);
-
     // Engine-specific test step for quick iteration on engine tests only.
     const engine_tests = b.addTest(.{
         .root_module = engine,
@@ -194,6 +187,14 @@ pub fn build(b: *std.Build) void {
     const run_engine_tests = b.addRunArtifact(engine_tests);
     const test_engine_step = b.step("test-engine", "Run engine tests only");
     test_engine_step.dependOn(&run_engine_tests.step);
+
+    // A top level step for running all tests. dependOn can be called multiple
+    // times and since the two run steps do not depend on one another, this will
+    // make the two of them run in parallel.
+    const test_step = b.step("test", "Run tests");
+    test_step.dependOn(&run_mod_tests.step);
+    test_step.dependOn(&run_exe_tests.step);
+    test_step.dependOn(&run_engine_tests.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //

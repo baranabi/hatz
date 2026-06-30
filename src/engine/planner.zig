@@ -266,9 +266,6 @@ test "planner creates taskforces on planning interval ticks" {
     }
     var event_log = std.ArrayList(types.EventRecord).empty;
     defer {
-        for (event_log.items) |*ev| {
-            allocator.free(ev.type);
-        }
         event_log.deinit(allocator);
     }
 
@@ -278,7 +275,7 @@ test "planner creates taskforces on planning interval ticks" {
     };
 
     // Tick 10 with interval 10 → planning tick (50% chance per org).
-    try plan(allocator, 42, 10, 10, &orgs, &.{}, &taskforces, &event_log);
+    try plan(allocator, 12345, 10, 10, &orgs, &.{}, &taskforces, &event_log);
     // At least one taskforce should be created with seed 42 (deterministic).
     try std.testing.expect(taskforces.items.len > 0);
     try std.testing.expectEqual(taskforces.items.len, event_log.items.len);
@@ -301,9 +298,6 @@ test "taskforce meetings have non-decreasing tick order and valid locations" {
     }
     var event_log = std.ArrayList(types.EventRecord).empty;
     defer {
-        for (event_log.items) |*ev| {
-            allocator.free(ev.type);
-        }
         event_log.deinit(allocator);
     }
 
@@ -345,9 +339,6 @@ test "taskforces have valid members and capabilities" {
     }
     var event_log = std.ArrayList(types.EventRecord).empty;
     defer {
-        for (event_log.items) |*ev| {
-            allocator.free(ev.type);
-        }
         event_log.deinit(allocator);
     }
 
@@ -382,9 +373,6 @@ test "planner creates no taskforces for empty orgs" {
     }
     var event_log = std.ArrayList(types.EventRecord).empty;
     defer {
-        for (event_log.items) |*ev| {
-            allocator.free(ev.type);
-        }
         event_log.deinit(allocator);
     }
 

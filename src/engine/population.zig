@@ -389,9 +389,9 @@ test "generate produces deterministic populations for same seed" {
         .n_capabilities = 16,
     };
 
-    const pop_a = try generate(allocator, 42, params);
+    var pop_a = try generate(allocator, 42, params);
     defer pop_a.deinit(allocator);
-    const pop_b = try generate(allocator, 42, params);
+    var pop_b = try generate(allocator, 42, params);
     defer pop_b.deinit(allocator);
 
     // Same seed → same results.
@@ -416,9 +416,9 @@ test "different seeds produce different populations" {
         .n_capabilities = 16,
     };
 
-    const pop_a = try generate(allocator, 42, params);
+    var pop_a = try generate(allocator, 42, params);
     defer pop_a.deinit(allocator);
-    const pop_b = try generate(allocator, 99, params);
+    var pop_b = try generate(allocator, 99, params);
     defer pop_b.deinit(allocator);
 
     // Different seeds → different hat color distributions (likely).
@@ -442,7 +442,7 @@ test "terrorist orgs contain only terrorist hats" {
         .n_capabilities = 16,
     };
 
-    const pop = try generate(allocator, 1234, params);
+    var pop = try generate(allocator, 1234, params);
     defer pop.deinit(allocator);
 
     for (pop.orgs) |org| {
@@ -468,7 +468,7 @@ test "every hat belongs to at least one org" {
         .n_capabilities = 16,
     };
 
-    const pop = try generate(allocator, 5678, params);
+    var pop = try generate(allocator, 5678, params);
     defer pop.deinit(allocator);
 
     var in_any_org = try allocator.alloc(bool, pop.hats.len);
@@ -499,7 +499,7 @@ test "hat true_color and advertised_color consistency" {
         .n_capabilities = 16,
     };
 
-    const pop = try generate(allocator, 9999, params);
+    var pop = try generate(allocator, 9999, params);
     defer pop.deinit(allocator);
 
     for (pop.hats) |hat| {
@@ -524,7 +524,7 @@ test "empty population generates zero hats and valid orgs" {
         .n_capabilities = 16,
     };
 
-    const pop = try generate(allocator, 42, params);
+    var pop = try generate(allocator, 42, params);
     defer pop.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 0), pop.hats.len);
@@ -544,21 +544,22 @@ test "population with max capabilities produces valid bitmask space" {
         .n_capabilities = 8,
     };
 
-    const pop = try generate(allocator, 9999, params);
+    var pop = try generate(allocator, 9999, params);
     defer pop.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 20), pop.hats.len);
-    // All hats in >0 orgs.
-    var in_any: usize = 0;
-    for (pop.hats) |hat| {
-        for (pop.orgs) |org| {
-            for (org.members) |mid| {
-                if (mid == hat.id) {
-                    in_any += 1;
-                    break;
-                }
-            }
+    // All hats in at least one org (use tracking array to avoid double-count).
+    var hat_found = try allocator.alloc(bool, pop.hats.len);
+    defer allocator.free(hat_found);
+    @memset(hat_found, false);
+    for (pop.orgs) |org| {
+        for (org.members) |mid| {
+            if (mid < pop.hats.len) hat_found[mid] = true;
         }
+    }
+    var in_any: usize = 0;
+    for (hat_found) |found| {
+        if (found) in_any += 1;
     }
     try std.testing.expectEqual(pop.hats.len, in_any);
 }
