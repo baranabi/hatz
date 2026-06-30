@@ -70,6 +70,10 @@ class WsClient:
         self._recv_queue: Queue = Queue()
         self._recv_thread: threading.Thread | None = None
         self._running = threading.Event()
+        # ponytail: event frames that recv_response() skipped while searching
+        # for the matching response frame. drain_events() merges these with
+        # any newly-arrived events from the recv queue.
+        self._event_buffer: list[dict] = []
 
     def connect(self):
         self._ws = WebSocket()
@@ -121,6 +125,11 @@ class WsClient:
         """Read until we get a proper response envelope (skipping event push frames).
 
         Returns the parsed dict or None on timeout.
+
+        NOTE: event push frames encountered while searching for the response
+        are buffered in _event_buffer and surfaced via drain_events(). Without
+        this buffer, recv_response would consume them silently since the recv
+        queue is drained frame by frame.
         """
         while True:
             raw = self.recv(timeout=timeout)
@@ -131,7 +140,9 @@ class WsClient:
             except json.JSONDecodeError:
                 continue
             # Skip event push frames ({"type":"event","payload":{...}})
+            # but save them so drain_events can still find them.
             if "ok" not in data:
+                self._event_buffer.append(data)
                 continue
             return data
 
@@ -140,9 +151,14 @@ class WsClient:
 
         These are out-of-band frames the daemon pushes asynchronously
         (e.g. {"type":"event","payload":{...}}).
+
+        Merges any event frames that recv_response() buffered while searching
+        for the matching response frame, together with newly-arrived frames
+        from the recv thread.
         Safe to call between commands to keep the queue clear.
         """
-        frames = []
+        frames = list(self._event_buffer)
+        self._event_buffer.clear()
         while True:
             try:
                 raw = self._recv_queue.get_nowait()
