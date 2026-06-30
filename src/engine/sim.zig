@@ -244,7 +244,6 @@ pub const RunState = struct {
                 .beaconId = beacon_id,
                 .alertLevel = .OFF,
                 .location = types.deterministicBeaconLocation(seed, beacon_id),
-                .vulnerabilities = state.beacon_vulnerabilities[idx][0..],
             };
             // Initialize alert tracking with OFF level.
             state.beacon_alert_tracking[idx] = BeaconAlertTracking{
@@ -353,7 +352,7 @@ pub fn advance(registry: *runs.Runs, allocator: std.mem.Allocator, payload: SimA
             hs.current_location = types.deterministicLocation(run.seed, tick, hat.id);
         }
         // Run organization planner each tick (only effective on planning_interval ticks).
-        try planner.plan(run.allocator, run.seed, run.params.planning_interval, tick, run.organizations, &run.taskforces, &run.event_log);
+        try planner.plan(run.allocator, run.seed, run.params.planning_interval, tick, run.organizations, run.beacons[0..], &run.taskforces, &run.event_log);
         // Execute any meetings scheduled at this tick.
         try meetings.executeMeetings(run, tick);
     }
@@ -374,7 +373,7 @@ pub fn advance(registry: *runs.Runs, allocator: std.mem.Allocator, payload: SimA
         if (defaults_list.len > 0) {
             var results: std.ArrayList(protocol.DefaultIbResult) = .empty;
             for (defaults_list) |request| {
-                const args_value = try parseArgsValue(allocator, request.args_json);
+                const args_value = try json_util.parseJsonValue(allocator, request.args_json);
                 const broker_payload = broker.BrokerCallRequestPayload{
                     .runId = run.run_id,
                     .analystId = default_analyst_id,
@@ -500,12 +499,7 @@ fn initialCapabilities(seed: u64, hat_id: types.HatId, n_caps: u32) u64 {
     return bits;
 }
 
-/// Parse stored JSON args into a dynamic value for broker calls.
-/// Defaults store args as JSON bytes to avoid lifetime issues.
-fn parseArgsValue(allocator: std.mem.Allocator, args_json: []const u8) !std.json.Value {
-    const parsed = try std.json.parseFromSlice(std.json.Value, allocator, args_json, .{ .allocate = .alloc_always });
-    return parsed.value;
-}
+// parseArgsValue moved to json_util.parseJsonValue
 
 // ── SimParams parse tests ─────────────────────────────────────────────
 
@@ -735,6 +729,27 @@ test "end returns complete scoring report with alert and arrest actions" {
 
     // totalTicks is > 0.
     try std.testing.expect(obj.get("totalTicks").?.integer > 0);
+}
+
+test "beacon vulnerabilities for seed=42 are all in [0, 15]" {
+    const allocator = std.testing.allocator;
+    var registry = runs.Runs.init(allocator);
+    defer registry.deinit();
+    const run = try registry.createRun(42, .{});
+    // Every beacon must have exactly 3 vulnerabilities (matching beacon_vuln_count),
+    // and every vulnerability value must be a per-cap ID in [0, 15] (not a raw
+    // bitmask that would exceed 15).
+    for (run.beacon_vulnerabilities, 0..) |vulns, beacon_idx| {
+        // Verify exact count: 3 per beacon.
+        try std.testing.expectEqual(@as(usize, 3), vulns.len);
+        for (vulns) |vuln| {
+            if (vuln > 15) {
+                std.debug.panic("beacon[{}] vulnerability {} exceeds 15 (got raw bitmask?)", .{ beacon_idx, vuln });
+            }
+            // Also verify that a hat with all 16 caps set could satisfy it.
+            try std.testing.expect(types.hasCapability(0xFFFF, vuln));
+        }
+    }
 }
 
 test "advance with 0 ticks does not change state" {

@@ -32,58 +32,58 @@ pub fn call(allocator: std.mem.Allocator, run: *sim.RunState, payload: BrokerCal
             .x = .{ .min = 0, .max = types.WorldMax },
             .y = .{ .min = 0, .max = types.WorldMax },
         };
-        return brokerResponse(allocator, payload.method, 0, tick, false, result);
+        return brokerResponse(allocator, run, payload.analystId, payload.method, 0, tick, false, result);
     }
     if (std.mem.eql(u8, payload.method, "ib.beacons")) {
         var list: std.ArrayList(BeaconRecord) = .empty;
-        for (run.beacons) |beacon| {
+        for (run.beacons, 0..) |beacon, idx| {
             try list.append(allocator, .{
                 .beaconId = beacon.beaconId,
                 .alertLevel = beacon.alertLevel,
                 .location = beacon.location,
-                .vulnerabilities = beacon.vulnerabilities,
+                .vulnerabilities = run.beacon_vulnerabilities[idx][0..],
             });
         }
         const result = ResultBeacons{ .beacons = try list.toOwnedSlice(allocator) };
-        return brokerResponse(allocator, payload.method, 0, tick, false, result);
+        return brokerResponse(allocator, run, payload.analystId, payload.method, 0, tick, false, result);
     }
     if (std.mem.eql(u8, payload.method, "ib.all_capabilities")) {
         const result = ResultAllCapabilities{ .capabilities = try capabilityRange(allocator, 16) };
-        return brokerResponse(allocator, payload.method, 0, tick, false, result);
+        return brokerResponse(allocator, run, payload.analystId, payload.method, 0, tick, false, result);
     }
     if (std.mem.eql(u8, payload.method, "ib.benign_organizations")) {
         const result = ResultOrganizations{ .organizationIds = try organizationRange(allocator, 100, 5) };
-        return brokerResponse(allocator, payload.method, 0, tick, false, result);
+        return brokerResponse(allocator, run, payload.analystId, payload.method, 0, tick, false, result);
     }
     if (std.mem.eql(u8, payload.method, "ib.terrorist_organizations")) {
         const result = ResultOrganizations{ .organizationIds = try organizationRange(allocator, 200, 2) };
-        return brokerResponse(allocator, payload.method, 0, tick, false, result);
+        return brokerResponse(allocator, run, payload.analystId, payload.method, 0, tick, false, result);
     }
     if (std.mem.eql(u8, payload.method, "ib.known_terrorist_hats")) {
         const result = ResultHatIds{ .hatIds = try knownTerroristHats(allocator, 5) };
-        return brokerResponse(allocator, payload.method, 0, tick, false, result);
+        return brokerResponse(allocator, run, payload.analystId, payload.method, 0, tick, false, result);
     }
     if (std.mem.eql(u8, payload.method, "ib.members")) {
         const args = try requireObject(payload.args);
         const org_id = try requireInt(args, "organizationId");
         const result = ResultMembers{ .hatIds = try orgMembers(allocator, @intCast(org_id)) };
-        return brokerResponse(allocator, payload.method, 0, tick, false, result);
+        return brokerResponse(allocator, run, payload.analystId, payload.method, 0, tick, false, result);
     }
     if (std.mem.eql(u8, payload.method, "ib.hat_advertised_color")) {
         const args = try requireObject(payload.args);
         const hat_id = try requireInt(args, "hatId");
         const color: types.HatAdvertisedColor = if (hat_id % 11 == 0) .TERRORIST else .UNKNOWN;
         const result = ResultHatAdvertisedColor{ .value = color };
-        return brokerResponse(allocator, payload.method, 0, tick, false, result);
+        return brokerResponse(allocator, run, payload.analystId, payload.method, 0, tick, false, result);
     }
     if (std.mem.eql(u8, payload.method, "ib.events_history")) {
         const result = ResultEventsHistory{ .events = run.event_log.items };
-        return brokerResponse(allocator, payload.method, 0, tick, false, result);
+        return brokerResponse(allocator, run, payload.analystId, payload.method, 0, tick, false, result);
     }
     if (std.mem.eql(u8, payload.method, "ib.clear_events_history")) {
         run.event_log.clearRetainingCapacity();
         const result = ResultClearEventsHistory{ .cleared = true };
-        return brokerResponse(allocator, payload.method, 0, tick, false, result);
+        return brokerResponse(allocator, run, payload.analystId, payload.method, 0, tick, false, result);
     }
     if (std.mem.eql(u8, payload.method, "ib.arrested_hats")) {
         var list: std.ArrayList(types.HatId) = .empty;
@@ -92,28 +92,31 @@ pub fn call(allocator: std.mem.Allocator, run: *sim.RunState, payload: BrokerCal
             try list.append(allocator, entry.key_ptr.*);
         }
         const result = ResultHatIds{ .hatIds = try list.toOwnedSlice(allocator) };
-        return brokerResponse(allocator, payload.method, 0, tick, false, result);
+        return brokerResponse(allocator, run, payload.analystId, payload.method, 0, tick, false, result);
     }
     if (std.mem.eql(u8, payload.method, "ib.last_location")) {
         const args = try requireObject(payload.args);
         const hat_id = try requireInt(args, "hatId");
         const payment = try requireNumber(args, "payment");
         const result = ResultLastLocation{ .location = types.deterministicLocation(run.seed, tick, @intCast(hat_id)) };
-        return brokerResponse(allocator, payload.method, payment, tick, false, result);
+        const resp = try brokerResponse(allocator, run, payload.analystId, payload.method, payment, tick, false, result);
+        return resp;
     }
     if (std.mem.eql(u8, payload.method, "ib.capabilities")) {
         const args = try requireObject(payload.args);
         const hat_id = try requireInt(args, "hatId");
         const payment = try requireNumber(args, "payment");
         const result = ResultCapabilities{ .capabilities = try hatCapabilities(allocator, @intCast(hat_id)) };
-        return brokerResponse(allocator, payload.method, payment, tick, false, result);
+        const resp = try brokerResponse(allocator, run, payload.analystId, payload.method, payment, tick, false, result);
+        return resp;
     }
     if (std.mem.eql(u8, payload.method, "ib.meeting_times")) {
         const args = try requireObject(payload.args);
         const hat_id = try requireInt(args, "hatId");
         const payment = try requireNumber(args, "payment");
         const result = ResultMeetingTimes{ .ticks = try meetingTimes(allocator, tick, @intCast(hat_id)) };
-        return brokerResponse(allocator, payload.method, payment, tick, false, result);
+        const resp = try brokerResponse(allocator, run, payload.analystId, payload.method, payment, tick, false, result);
+        return resp;
     }
     if (std.mem.eql(u8, payload.method, "ib.meeting_location")) {
         const args = try requireObject(payload.args);
@@ -125,7 +128,8 @@ pub fn call(allocator: std.mem.Allocator, run: *sim.RunState, payload: BrokerCal
         else
             null;
         const result = ResultMeetingLocation{ .location = location };
-        return brokerResponse(allocator, payload.method, payment, tick, false, result);
+        const resp = try brokerResponse(allocator, run, payload.analystId, payload.method, payment, tick, false, result);
+        return resp;
     }
     if (std.mem.eql(u8, payload.method, "ib.meeting_participants")) {
         const args = try requireObject(payload.args);
@@ -134,7 +138,7 @@ pub fn call(allocator: std.mem.Allocator, run: *sim.RunState, payload: BrokerCal
         const payment = try requireNumber(args, "payment");
         const participants = if (meeting_tick % 3 == 0) @as(?[]types.HatId, try meetingParticipants(allocator, meeting_tick)) else null;
         const result = ResultMeetingParticipants{ .hatIds = participants };
-        return brokerResponse(allocator, payload.method, payment, tick, false, result);
+        return brokerResponse(allocator, run, payload.analystId, payload.method, payment, tick, false, result);
     }
     if (std.mem.eql(u8, payload.method, "ib.meeting_trades")) {
         const args = try requireObject(payload.args);
@@ -143,7 +147,7 @@ pub fn call(allocator: std.mem.Allocator, run: *sim.RunState, payload: BrokerCal
         const payment = try requireNumber(args, "payment");
         const trades = if (meeting_tick % 4 == 0) @as(?[]TradeRecord, try meetingTrades(allocator, meeting_tick)) else null;
         const result = ResultMeetingTrades{ .trades = trades };
-        return brokerResponse(allocator, payload.method, payment, tick, false, result);
+        return brokerResponse(allocator, run, payload.analystId, payload.method, payment, tick, false, result);
     }
     return error.UnknownMethod;
 }
@@ -229,7 +233,12 @@ const ResultMeetingTrades = struct {
 
 /// Wrap a typed result into a broker response with metadata.
 /// Uses JSON round-tripping to avoid custom serialization per result type.
-fn brokerResponse(allocator: std.mem.Allocator, method: []const u8, charged: types.Payment, tick: types.Tick, noisy: bool, result: anytype) !BrokerCallResponsePayload {
+/// Tracks analyst spend from the charged amount.
+fn brokerResponse(allocator: std.mem.Allocator, run: *sim.RunState, analystId: []const u8, method: []const u8, charged: types.Payment, tick: types.Tick, noisy: bool, result: anytype) !BrokerCallResponsePayload {
+    // Track analyst spend.
+    if (run.analyst_states.getPtr(analystId)) |analyst| {
+        analyst.spend_total += charged;
+    }
     const result_value = try valueFromStruct(allocator, result);
     return BrokerCallResponsePayload{
         .method = method,

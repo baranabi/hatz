@@ -85,7 +85,7 @@ pub fn list(allocator: std.mem.Allocator, run: *sim.RunState, payload: DefaultsL
     const analyst = try getOrCreateAnalyst(run, payload.analystId);
     var out: std.ArrayList(protocol.DefaultIbRequest) = .empty;
     for (analyst.defaults.items) |stored| {
-        const args_value = try parseArgsValue(allocator, stored.args_json);
+        const args_value = try json_util.parseJsonValue(allocator, stored.args_json);
         try out.append(allocator, protocol.DefaultIbRequest{
             .method = stored.method,
             .args = args_value,
@@ -131,8 +131,4 @@ fn freeStoredRequest(allocator: std.mem.Allocator, request: sim.DefaultIbRequest
     allocator.free(request.args_json);
 }
 
-/// Parse stored JSON args for re-use in broker calls.
-fn parseArgsValue(allocator: std.mem.Allocator, args_json: []const u8) !std.json.Value {
-    const parsed = try std.json.parseFromSlice(std.json.Value, allocator, args_json, .{ .allocate = .alloc_always });
-    return parsed.value;
-}
+// parseArgsValue moved to json_util.parseJsonValue

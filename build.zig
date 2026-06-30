@@ -114,6 +114,22 @@ pub fn build(b: *std.Build) void {
     // This will evaluate the `run` step rather than the default step.
     // For a top level step to actually do something, it must depend on other
     // steps (e.g. a Run step, as we will see in a moment).
+    // ── WebSocket daemon executable ──────────────────────────────────────
+    const daemon_exe = b.addExecutable(.{
+        .name = "hatz-daemon",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main_daemon.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "engine", .module = engine },
+            },
+        }),
+    });
+    b.installArtifact(daemon_exe);
+    const daemon_step = b.step("daemon", "Build the WebSocket daemon (hatz-daemon)");
+    daemon_step.dependOn(b.getInstallStep());
+
     const run_step = b.step("run", "Run the app");
 
     // This creates a RunArtifact step in the build graph. A RunArtifact step
@@ -170,6 +186,14 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
+
+    // Engine-specific test step for quick iteration on engine tests only.
+    const engine_tests = b.addTest(.{
+        .root_module = engine,
+    });
+    const run_engine_tests = b.addRunArtifact(engine_tests);
+    const test_engine_step = b.step("test-engine", "Run engine tests only");
+    test_engine_step.dependOn(&run_engine_tests.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //

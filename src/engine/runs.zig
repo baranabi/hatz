@@ -30,12 +30,11 @@ pub const Runs = struct {
     }
 
     /// Create a new run with a deterministic id derived from seed and an incrementing counter.
-    /// The params JSON is stored on the run for later retrieval/inspection.
-    pub fn createRun(self: *Runs, seed: u64, params_json: []u8) !*sim.RunState {
+    pub fn createRun(self: *Runs, seed: u64, params: sim.SimParams) !*sim.RunState {
         const run_id = try std.fmt.allocPrint(self.allocator, "run-{d}-{d}", .{ seed, self.next_id });
         self.next_id += 1;
         const run_ptr = try self.allocator.create(sim.RunState);
-        run_ptr.* = try sim.RunState.init(self.allocator, run_id, seed, params_json);
+        run_ptr.* = try sim.RunState.init(self.allocator, run_id, seed, params);
         try self.map.put(run_id, run_ptr);
         return run_ptr;
     }

@@ -1,4 +1,57 @@
-.zig-cache/
+# === Zig ===
 zig-out/
+.zig-cache/
+.zig-verify-cache/
 *.o
+*.obj
+*.ko
+*.so
+
+# === Compiled binaries (root-anchored to avoid catching source files) ===
+/root
+/test-replay
+/test-*
+/hermes-verify-*
+
+# === Build intermediates ===
+*.d
+*.ll
+*.bc
+
+# === Coverage ===
+coverage/
+kcov_test_out*/
+covr_*/
+
+# === macOS ===
 .DS_Store
+.DS_Store?
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# === Editor / IDE ===
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.sublime-*
+
+# === Hermes Agent ===
+.hermes/
+.hermes.md
+
+# === Generated contract test output ===
+tools/contract/examples/output/
+
+# === Python ===
+hatz-cli/.venv/
+
+# === Backup files ===
+*.bak
+*.backup
+*.orig

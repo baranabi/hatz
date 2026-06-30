@@ -1,1 +1,1 @@
-{"contractVersion":"1.0.0","ok":true,"payload":{"runId":"run-99999-2","fromTick":0,"toTick":20,"eventsEmitted":9,"defaultRequestResults":null,"timing":null},"error":null,"requestId":"req-11-advance-2"}
+{"contractVersion":"1.0.0","ok":true,"payload":{"runId":"run-99999-2","fromTick":0,"toTick":20,"eventsEmitted":10,"defaultRequestResults":null,"timing":null},"error":null,"requestId":"req-11-advance-2"}
