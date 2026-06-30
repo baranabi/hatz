@@ -84,7 +84,16 @@ pub fn start(io: std.Io, host: []const u8, port: u16) !void {
                 continue;
             },
         };
-        defer stream.close(io);
+        // ponytail: close synchronously to avoid CLOSE_WAIT accumulation.
+        // stream.close(io) is async on the threaded backend — the actual
+        // close(2) syscall is deferred to the Io thread's event loop.
+        // If clients reconnect rapidly, close operations queue up faster
+        // than they're processed and the kernel keeps old sockets in
+        // CLOSE_WAIT until the backlog drains. By closing the fd directly
+        // with posix.close we guarantee the close completes before the
+        // accept loop picks up the next connection.
+        const client_fd = stream.socket.handle;
+        defer _ = std.c.close(client_fd);
 
         connection_count += 1;
         log.info("[{d}] connection opened", .{connection_count});
