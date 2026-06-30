@@ -73,10 +73,12 @@ pub fn dispatch(registry: *runs.Runs, allocator: std.mem.Allocator, request: pro
 
 /// Convert a dynamic JSON value into a typed payload by re-stringifying.
 /// This avoids re-implementing JSON decoding for every message shape.
+/// The returned value owns its allocations — caller should free them via `std.json.parseFree(T, value, allocator)` if T has allocated fields.
 pub fn parsePayload(comptime T: type, allocator: std.mem.Allocator, value: std.json.Value) !T {
     const json_text = try json_util.stringifyAlloc(allocator, value);
-    const parsed = try std.json.parseFromSlice(T, allocator, json_text, .{ .allocate = .alloc_always });
-    return parsed.value;
+    defer allocator.free(json_text);
+    const parsed = try std.json.parseFromSliceLeaky(T, allocator, json_text, .{ .allocate = .alloc_always });
+    return parsed;
 }
 
 /// Wrap a typed payload into a success EnvelopeResponse value.
@@ -110,8 +112,11 @@ fn okResponseObject(allocator: std.mem.Allocator, request: protocol.EnvelopeRequ
 
 /// Convert a typed response payload into a dynamic JSON value.
 /// This keeps the router independent of schema-specific JSON builders.
+/// Caller owns the returned std.json.Value and **must** call `json_util.jsonValueDeinit(allocator, &value)` when done.
 pub fn valueFromStruct(allocator: std.mem.Allocator, value: anytype) !std.json.Value {
     const json_text = try json_util.stringifyAlloc(allocator, value);
+    defer allocator.free(json_text);
     const parsed = try std.json.parseFromSlice(std.json.Value, allocator, json_text, .{ .allocate = .alloc_always });
-    return parsed.value;
+    defer parsed.deinit();
+    return try json_util.jsonValueClone(allocator, &parsed.value);
 }

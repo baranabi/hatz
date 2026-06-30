@@ -108,6 +108,7 @@ test "broker ib.beacons returns same locations as run.beacons" {
         .method = "ib.beacons",
         .args = .{ .null = {} },
     });
+    defer json_util.jsonValueDeinit(allocator, &broker_resp.result);
 
     const result = broker_resp.result;
     try std.testing.expect(result == .object);

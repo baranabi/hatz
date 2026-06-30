@@ -4,6 +4,7 @@ const types = @import("types.zig");
 const sim = @import("sim.zig");
 const broker = @import("broker.zig");
 const runs = @import("runs.zig");
+const json_util = @import("json_util.zig");
 
 fn newObject(allocator: std.mem.Allocator) !std.json.ObjectMap {
     return std.json.ObjectMap.init(allocator, &.{}, &.{});
@@ -46,6 +47,7 @@ test "paid queries return real data + noise model applies" {
             .runId = run_id, .analystId = "test",
             .method = "ib.capabilities", .args = .{ .object = args },
         });
+        defer json_util.jsonValueDeinit(allocator, &resp.result);
         try std.testing.expectEqualStrings("ib.capabilities", resp.method);
         try std.testing.expect(resp.charged > 0);
         const caps = resp.result.object.get("capabilities").?.array;
@@ -62,6 +64,7 @@ test "paid queries return real data + noise model applies" {
             .runId = run_id, .analystId = "test",
             .method = "ib.last_location", .args = .{ .object = args },
         });
+        defer json_util.jsonValueDeinit(allocator, &resp.result);
         try std.testing.expectEqualStrings("ib.last_location", resp.method);
         const loc = resp.result.object.get("location").?;
         if (loc != .null) {
@@ -84,6 +87,7 @@ test "paid queries return real data + noise model applies" {
             .runId = run_id, .analystId = "test",
             .method = "ib.meeting_times", .args = .{ .object = args },
         });
+        defer json_util.jsonValueDeinit(allocator, &resp.result);
         try std.testing.expectEqualStrings("ib.meeting_times", resp.method);
         _ = resp.result.object.get("ticks").?.array;
         std.debug.print("  OK meeting_times: noisy={}\n", .{resp.metadata.noisy});
@@ -99,6 +103,7 @@ test "paid queries return real data + noise model applies" {
             .runId = run_id, .analystId = "test",
             .method = "ib.meeting_location", .args = .{ .object = args },
         });
+        defer json_util.jsonValueDeinit(allocator, &resp.result);
         try std.testing.expectEqualStrings("ib.meeting_location", resp.method);
         std.debug.print("  OK meeting_location: noisy={}\n", .{resp.metadata.noisy});
     }
@@ -116,6 +121,7 @@ test "paid queries return real data + noise model applies" {
             .runId = run_id, .analystId = "test",
             .method = "ib.meeting_participants", .args = .{ .object = args },
         });
+        defer json_util.jsonValueDeinit(allocator, &resp.result);
         try std.testing.expectEqualStrings("ib.meeting_participants", resp.method);
         std.debug.print("  OK meeting_participants: noisy={}\n", .{resp.metadata.noisy});
     }
@@ -133,6 +139,7 @@ test "paid queries return real data + noise model applies" {
             .runId = run_id, .analystId = "test",
             .method = "ib.meeting_trades", .args = .{ .object = args },
         });
+        defer json_util.jsonValueDeinit(allocator, &resp.result);
         try std.testing.expectEqualStrings("ib.meeting_trades", resp.method);
         std.debug.print("  OK meeting_trades: noisy={}\n", .{resp.metadata.noisy});
     }
@@ -146,6 +153,7 @@ test "paid queries return real data + noise model applies" {
             .runId = run_id, .analystId = "test",
             .method = "ib.capabilities", .args = .{ .object = args },
         });
+        defer json_util.jsonValueDeinit(allocator, &resp.result);
         try std.testing.expect(resp.metadata.noisy);
         try std.testing.expectEqual(@as(usize, 0), resp.result.object.get("capabilities").?.array.items.len);
         std.debug.print("  OK zero_payment: noisy={}, caps empty\n", .{resp.metadata.noisy});
@@ -160,6 +168,7 @@ test "paid queries return real data + noise model applies" {
             .runId = run_id, .analystId = "test",
             .method = "ib.capabilities", .args = .{ .object = args },
         });
+        defer json_util.jsonValueDeinit(allocator, &resp.result);
         try std.testing.expect(!resp.metadata.noisy); // unknown hat isn't "noisy", just empty
         try std.testing.expectEqual(@as(usize, 0), resp.result.object.get("capabilities").?.array.items.len);
         std.debug.print("  OK unknown_hat: capabilities empty, noisy={}\n", .{resp.metadata.noisy});
@@ -174,6 +183,7 @@ test "paid queries return real data + noise model applies" {
             .runId = run_id, .analystId = "test",
             .method = "ib.last_location", .args = .{ .object = args },
         });
+        defer json_util.jsonValueDeinit(allocator, &resp.result);
         try std.testing.expect(!resp.metadata.noisy);
         try std.testing.expect(resp.result.object.get("location").? == .null);
         std.debug.print("  OK unknown_hat last_location: null, noisy={}\n", .{resp.metadata.noisy});

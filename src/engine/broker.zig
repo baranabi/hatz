@@ -500,10 +500,13 @@ fn meetingTrades(allocator: std.mem.Allocator, meeting_tick: types.Tick) ![]Trad
 }
 
 /// Convert a typed struct into a dynamic JSON value via stringify/parse.
+/// Caller owns the returned std.json.Value and **must** call `json_util.jsonValueDeinit(allocator, &value)` when done.
 fn valueFromStruct(allocator: std.mem.Allocator, value: anytype) !std.json.Value {
     const json_text = try json_util.stringifyAlloc(allocator, value);
+    defer allocator.free(json_text);
     const parsed = try std.json.parseFromSlice(std.json.Value, allocator, json_text, .{ .allocate = .alloc_always });
-    return parsed.value;
+    defer parsed.deinit();
+    return try json_util.jsonValueClone(allocator, &parsed.value);
 }
 
 /// Require a JSON object and return its map.
@@ -611,6 +614,7 @@ test "paid query charges payment and marks noisy" {
         .method = "ib.capabilities",
         .args = std.json.Value{ .object = args },
     });
+    defer json_util.jsonValueDeinit(allocator, &resp.result);
 
     // Charged should equal payment for paid methods.
     try std.testing.expectEqual(@as(types.Payment, 5.0), resp.charged);
@@ -638,17 +642,23 @@ test "spend tracking accumulates across calls" {
     try args.put(allocator, "payment", std.json.Value{ .float = 3.0 });
 
     // First call: should charge 3.0.
-    _ = try call(allocator, run, .{
-        .runId = run_id, .analystId = "spend-test",
-        .method = "ib.last_location", .args = std.json.Value{ .object = args },
-    });
+    {
+        const resp = try call(allocator, run, .{
+            .runId = run_id, .analystId = "spend-test",
+            .method = "ib.last_location", .args = std.json.Value{ .object = args },
+        });
+        defer json_util.jsonValueDeinit(allocator, &resp.result);
+    }
     try std.testing.expectEqual(@as(types.Payment, 3.0), analyst.spend_total);
 
     // Second call: should add another 3.0 = 6.0 total.
-    _ = try call(allocator, run, .{
-        .runId = run_id, .analystId = "spend-test",
-        .method = "ib.last_location", .args = std.json.Value{ .object = args },
-    });
+    {
+        const resp = try call(allocator, run, .{
+            .runId = run_id, .analystId = "spend-test",
+            .method = "ib.last_location", .args = std.json.Value{ .object = args },
+        });
+        defer json_util.jsonValueDeinit(allocator, &resp.result);
+    }
     try std.testing.expectEqual(@as(types.Payment, 6.0), analyst.spend_total);
 }
 
@@ -665,6 +675,7 @@ test "free queries have charged=0 and noisy=false" {
         .runId = run_id, .analystId = "test",
         .method = "ib.beacons", .args = std.json.Value{ .object = empty_args },
     });
+    defer json_util.jsonValueDeinit(allocator, &resp.result);
     try std.testing.expectEqual(@as(types.Payment, 0), resp.charged);
     try std.testing.expect(!resp.metadata.noisy);
 }
