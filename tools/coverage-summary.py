@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Generate a coverage step summary from kcov's index.html and write to GITHUB_STEP_SUMMARY.
-Also generate cobertura.xml for Codecov upload with proper per-line entries.
 
-This script never exits with a non-zero code — it's supplementary."""
+kcov natively generates both index.html and cobertura.xml in its output directory.
+This script only handles the step summary (markdown table for GitHub Actions UI).
+The native cobertura.xml is used for Codecov upload.
+
+ponytail: We used to generate a synthetic Cobertura XML here, but it had incorrect
+per-line entries (first N lines blindly assigned as covered). kcov's native output
+is correct, so we now rely on it exclusively."""
 
 import os
 import re
 import sys
-import xml.etree.ElementTree as ET
-from xml.dom import minidom
 
 
 def parse_coverage_html(index_path: str):
@@ -50,114 +53,41 @@ def write_step_summary(files: list, summary_file: str):
         md_lines.append(
             f"| **Total** | **{total_lines}** | **{total_covered}** | **{total_missed}** | **{total_pct}** |"
         )
+    else:
+        md_lines.append("| **No coverage data found** | | | | |")
 
     with open(summary_file, "a") as f:
         f.write("\n".join(md_lines) + "\n")
-    print(f"Wrote {len(files)} file rows + total to {summary_file}")
+    print(f"Wrote {len(files)} file rows to {summary_file}")
 
 
-def write_cobertura_xml(files: list, output_path: str, source_dir: str = "."):
-    """Generate a Cobertura XML from parsed coverage data.
-
-    Creates proper per-line entries so Codecov accepts the report.
-    For each file with N total lines and C covered, we generate N line entries:
-    - hits=1 for the first C lines (covered)
-    - hits=0 for the remaining N-C lines (missed)
-    This gives Codecov the correct total coverage percentage.
-    """
-    total_lines = sum(f[1] for f in files)
-    total_covered = sum(f[2] for f in files)
-    total_rate = total_covered / total_lines if total_lines > 0 else 0.0
-
-    # Group files by package (directory)
-    packages: dict[str, list] = {}
-    for name, l, c, m, pct in files:
-        pkg = os.path.dirname(name).replace("/", ".")
-        if not pkg:
-            pkg = "root"
-        if pkg not in packages:
-            packages[pkg] = []
-        packages[pkg].append((name, l, c, m, pct))
-
-    coverage_elem = ET.Element("coverage")
-    coverage_elem.set("line-rate", str(total_rate))
-    coverage_elem.set("branch-rate", "0")
-    coverage_elem.set("lines-covered", str(total_covered))
-    coverage_elem.set("lines-valid", str(total_lines))
-    coverage_elem.set("branches-covered", "0")
-    coverage_elem.set("branches-valid", "0")
-    coverage_elem.set("complexity", "0")
-    coverage_elem.set("version", "1.0")
-    coverage_elem.set("timestamp", "0")
-
-    sources_elem = ET.SubElement(coverage_elem, "sources")
-    source_elem = ET.SubElement(sources_elem, "source")
-    source_elem.text = source_dir
-
-    packages_elem = ET.SubElement(coverage_elem, "packages")
-
-    for pkg_name, pkg_files in sorted(packages.items()):
-        pkg_total = sum(f[1] for f in pkg_files)
-        pkg_covered = sum(f[2] for f in pkg_files)
-        pkg_elem = ET.SubElement(packages_elem, "package")
-        pkg_elem.set("name", pkg_name)
-        pkg_elem.set("line-rate", str(pkg_covered / pkg_total) if pkg_total > 0 else "0")
-        pkg_elem.set("branch-rate", "0")
-        pkg_elem.set("complexity", "0")
-
-        classes_elem = ET.SubElement(pkg_elem, "classes")
-        for name, l, c, m, pct in pkg_files:
-            cls_elem = ET.SubElement(classes_elem, "class")
-            cls_elem.set("name", os.path.basename(name))
-            cls_elem.set("filename", name)
-            cls_elem.set("line-rate", str(c / l) if l > 0 else "0")
-            cls_elem.set("branch-rate", "0")
-            cls_elem.set("complexity", "0")
-            methods_elem = ET.SubElement(cls_elem, "methods")
-            lines_elem = ET.SubElement(cls_elem, "lines")
-            # Generate per-line entries:
-            # covered lines (hits=1) for first C lines,
-            # missed lines (hits=0) for remaining N-C lines.
-            for lineno in range(1, l + 1):
-                hits = "1" if lineno <= c else "0"
-                line_elem = ET.SubElement(lines_elem, "line")
-                line_elem.set("number", str(lineno))
-                line_elem.set("hits", hits)
-                line_elem.set("branch", "false")
-
-    rough = ET.tostring(coverage_elem, encoding="unicode")
-    dom = minidom.parseString(rough)
-    pretty = dom.toprettyxml(indent="  ")
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    with open(output_path, "w") as f:
-        f.write(pretty)
-    print(f"Wrote Cobertura XML ({len(files)} files, {total_covered}/{total_lines} lines, {total_rate:.1%}) to {output_path}")
+# ponytail: kcov generates its own native cobertura.xml with correct per-line coverage data.
+# Our synthetic version was overwriting it with fake per-line entries (first N lines assigned
+# as covered), causing Codecov to reject the data. We now rely on kcov's native output.
 
 
 def main() -> None:
     index_path = "coverage/index.html"
-    if not os.path.exists(index_path):
-        print(f"coverage-summary.py: {index_path} not found -- skipping", file=sys.stderr)
-        return
+    files: list = []
 
-    try:
-        files = parse_coverage_html(index_path)
-        if not files:
-            print("coverage-summary.py: no coverage rows found in index.html", file=sys.stderr)
-            return
+    if os.path.exists(index_path):
+        try:
+            files = parse_coverage_html(index_path)
+        except Exception as e:
+            print(f"coverage-summary.py: error parsing {index_path}: {e}", file=sys.stderr)
+    else:
+        print(f"coverage-summary.py: {index_path} not found -- using empty coverage", file=sys.stderr)
 
-        # Write GitHub step summary
-        summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
-        if summary_file:
-            write_step_summary(files, summary_file)
-        else:
-            print("coverage-summary.py: GITHUB_STEP_SUMMARY not set (not in CI) -- skipping step summary", file=sys.stderr)
+    # Write GitHub step summary (may be empty if no coverage data)
+    summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_file:
+        write_step_summary(files, summary_file)
+    else:
+        print("coverage-summary.py: GITHUB_STEP_SUMMARY not set -- skipping step summary", file=sys.stderr)
 
-        # Write Cobertura XML for Codecov
-        write_cobertura_xml(files, "coverage/cobertura.xml")
-    except Exception as e:
-        # Never fail — supplementary script
-        print(f"coverage-summary.py error (non-fatal): {e}", file=sys.stderr)
+    # ponytail: kcov generates its own native cobertura.xml — we rely on that for Codecov.
+    # Only write step summary here. kcov's native XML has correct per-line coverage data
+    # which our synthetic version lacked, causing 0% on Codecov.
 
 
 if __name__ == "__main__":

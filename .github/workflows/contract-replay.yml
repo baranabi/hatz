@@ -68,9 +68,25 @@ jobs:
           kcov --version
       - name: Run coverage
         run: bash tools/coverage.sh
-      - name: Generate coverage step summary and Cobertura XML
+      - name: Generate coverage step summary
         continue-on-error: true
-        run: python3 tools/coverage-summary.py
+        run: |
+          python3 tools/coverage-summary.py
+      - name: Verify kcov native Cobertura XML
+        continue-on-error: true
+        run: |
+          {
+            echo "### kcov Native Cobertura XML"
+            if [ -f coverage/cobertura.xml ]; then
+              echo "coverage/cobertura.xml exists ($(wc -c < coverage/cobertura.xml) bytes)"
+              grep -o 'lines-covered="[0-9]*"' coverage/cobertura.xml | head -1
+              grep -o 'line-rate="[^"]*"' coverage/cobertura.xml | head -1
+            else
+              echo "WARNING: kcov did NOT produce a native cobertura.xml"
+              echo "Files in coverage/:"
+              find coverage/ -type f | sort
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Debug coverage directory contents
         continue-on-error: true
         run: |
