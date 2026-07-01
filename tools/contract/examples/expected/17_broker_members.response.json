@@ -1,0 +1,1 @@
+{"contractVersion":"1.0.0","ok":true,"payload":{"method":"ib.members","charged":0,"result":{"hatIds":[88,135,7,86,40,131,34,159,138,26,173]},"metadata":{"tick":20,"noisy":false}},"error":null,"requestId":"req-17-broker-members"}

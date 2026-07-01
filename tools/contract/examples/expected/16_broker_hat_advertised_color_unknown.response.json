@@ -1,0 +1,1 @@
+{"contractVersion":"1.0.0","ok":true,"payload":{"method":"ib.hat_advertised_color","charged":0,"result":{"value":"NOT_A_KNOWN_HAT"},"metadata":{"tick":20,"noisy":false}},"error":null,"requestId":"req-16-broker-hat-advertised-color-unknown"}

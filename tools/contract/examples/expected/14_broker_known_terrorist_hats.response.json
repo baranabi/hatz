@@ -1,0 +1,1 @@
+{"contractVersion":"1.0.0","ok":true,"payload":{"method":"ib.known_terrorist_hats","charged":0,"result":{"hatIds":[7,17,23,34,37,47,48,64,69,74,78,86,91,92,105,107,113,118,125,126,128,131,135,153,158,159,173,187]},"metadata":{"tick":20,"noisy":false}},"error":null,"requestId":"req-14-broker-known-terrorist-hats"}
