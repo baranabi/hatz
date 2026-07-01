@@ -37,7 +37,7 @@ jobs:
     continue-on-error: true  # non-blocking — step summary & artifact survive
     permissions:
       contents: read
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,17 +45,36 @@ jobs:
         uses: mlugg/setup-zig@v2
         with:
           version: 0.16.0
-      - name: Install kcov
+      - name: Install zig-kcov (build from source)
+        timeout-minutes: 10
         run: |
-          brew install kcov
-          # kcov on macOS needs ad-hoc codesigning for ptrace debugging
-          KCOV_BIN=$(brew --prefix kcov)/bin/kcov
-          if [ -f "$KCOV_BIN" ]; then
-            codesign --entitlements "$(brew --prefix kcov)/share/kcov/osx-entitlements.xml" \
-              --force -s - "$KCOV_BIN" 2>/dev/null || true
-          fi
+          # roc-lang/zig-kcov fork — handles Zig DWARF properly.
+          # Prebuilt binaries crash with SIGILL on GH runners (CPU features),
+          # so build from source using the same zig.
+          git clone --depth 1 --branch kcov-zig https://github.com/roc-lang/zig-kcov.git /tmp/zig-kcov
+          cd /tmp/zig-kcov
+          # System deps required by kcov
+          sudo apt-get update
+          sudo apt-get install -y libdwarf-dev libcurl4-openssl-dev zlib1g-dev pkg-config libelf-dev
+          # Ubuntu's libdwarf-dev has no pkg-config file
+          sudo tee /usr/lib/x86_64-linux-gnu/pkgconfig/libdwarf.pc <<'EOF'
+          prefix=/usr
+          exec_prefix=${prefix}
+          libdir=${prefix}/lib/x86_64-linux-gnu
+          includedir=${prefix}/include
+          Name: libdwarf
+          Description: DWARF debugging information library
+          Version: 0.4.2
+          Libs: -L${libdir} -ldwarf
+          Cflags: -I${includedir}
+          Requires: libelf
+          EOF
+          # Build with the runner's zig (CPU-safe)
+          zig build -Doptimize=ReleaseFast
+          sudo install -m 755 zig-out/bin/kcov /usr/local/bin/kcov
+          kcov --version
       - name: Run coverage
-        timeout-minutes: 5
+        timeout-minutes: 10
         run: bash tools/coverage.sh
       - name: Generate coverage step summary
         continue-on-error: true
