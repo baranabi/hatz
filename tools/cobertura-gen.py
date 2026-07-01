@@ -61,12 +61,18 @@ def parse_index_js(js_path: str) -> list:
 
     result = []
     for entry in file_list:
-        name = entry.get("name", "")
+        # kcov index.js uses "summary_name" for the file path display name
+        name = entry.get("summary_name", "") or entry.get("name", "")
         if not name or "src/engine" not in name:
             continue
-        lines = entry.get("lines", 0) or 0
-        covered = entry.get("covered", 0) or 0
-        result.append((name, lines, covered, lines - covered))
+        # Strip "[...]/" prefix that kcov adds for path abbreviation
+        if name.startswith("[...]/"):
+            name = name[6:]
+        # kcov index.js JSON fields (from getIndexHeader):
+        #   total_lines, covered_lines, uncovered_lines, covered (pct string)
+        total = entry.get("total_lines", 0) or entry.get("lines", 0) or 0
+        covered = entry.get("covered_lines", 0) or entry.get("covered", 0) or 0
+        result.append((name, int(total), int(covered), int(total) - int(covered)))
 
     return result
 
