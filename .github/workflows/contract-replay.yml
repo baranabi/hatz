@@ -43,8 +43,22 @@ jobs:
         uses: mlugg/setup-zig@v2
         with:
           version: 0.16.0
-      - name: Install kcov
-        run: sudo apt-get update && sudo apt-get install -y kcov
+      - name: Install kcov build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            binutils-dev build-essential cmake libssl-dev \
+            libcurl4-openssl-dev libelf-dev zlib1g-dev \
+            libdw-dev libiberty-dev
+      - name: Build kcov from source
+        run: |
+          git clone --depth 1 --branch v43 \
+            https://github.com/SimonKagstrom/kcov.git /tmp/kcov-src
+          cd /tmp/kcov-src
+          mkdir -p build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          make -j"$(nproc)"
+          sudo make install
       - name: Run coverage
         run: bash tools/coverage.sh
       - name: Upload coverage report
