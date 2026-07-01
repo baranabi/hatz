@@ -132,3 +132,119 @@ fn freeStoredRequest(allocator: std.mem.Allocator, request: sim.DefaultIbRequest
 }
 
 // parseArgsValue moved to json_util.parseJsonValue
+
+// ── Tests ──────────────────────────────────────────────────────────
+
+test "defaults.add stores requests and returns correct count" {
+    const allocator = std.testing.allocator;
+    var registry = sim.initForTesting(allocator);
+    defer registry.deinit();
+    const run = try registry.createRun(42, sim.SimParams{ .n_hats = 10 });
+    const resp = try add(allocator, run, .{
+        .runId = run.run_id,
+        .analystId = "analyst-1",
+        .requests = &.{
+            protocol.DefaultIbRequest{ .method = "ib.capabilities", .args = std.json.Value{ .null = {} } },
+            protocol.DefaultIbRequest{ .method = "ib.last_location", .args = std.json.Value{ .null = {} } },
+        },
+    });
+    try std.testing.expectEqual(@as(u64, 2), resp.totalDefaults);
+}
+
+test "defaults.add twice accumulates and list returns them" {
+    const allocator = std.testing.allocator;
+    var registry = sim.initForTesting(allocator);
+    defer registry.deinit();
+    const run = try registry.createRun(42, sim.SimParams{ .n_hats = 10 });
+    _ = try add(allocator, run, .{
+        .runId = run.run_id, .analystId = "analyst-1",
+        .requests = &.{protocol.DefaultIbRequest{ .method = "ib.capabilities", .args = std.json.Value{ .null = {} } }},
+    });
+    _ = try add(allocator, run, .{
+        .runId = run.run_id, .analystId = "analyst-1",
+        .requests = &.{protocol.DefaultIbRequest{ .method = "ib.last_location", .args = std.json.Value{ .null = {} } }},
+    });
+    const list_resp = try list(allocator, run, .{ .runId = run.run_id, .analystId = "analyst-1" });
+    defer {
+        for (list_resp.requests) |r| json_util.jsonValueDeinit(allocator, &r.args);
+        allocator.free(list_resp.requests);
+    }
+    try std.testing.expectEqual(@as(usize, 2), list_resp.requests.len);
+    try std.testing.expectEqualStrings("ib.capabilities", list_resp.requests[0].method);
+    try std.testing.expectEqualStrings("ib.last_location", list_resp.requests[1].method);
+}
+
+test "defaults.list returns empty for analyst with no defaults" {
+    const allocator = std.testing.allocator;
+    var registry = sim.initForTesting(allocator);
+    defer registry.deinit();
+    const run = try registry.createRun(42, sim.SimParams{ .n_hats = 10 });
+    const list_resp = try list(allocator, run, .{ .runId = run.run_id, .analystId = "empty-analyst" });
+    defer allocator.free(list_resp.requests);
+    try std.testing.expectEqual(@as(usize, 0), list_resp.requests.len);
+}
+
+test "defaults.remove removes matching request" {
+    const allocator = std.testing.allocator;
+    var registry = sim.initForTesting(allocator);
+    defer registry.deinit();
+    const run = try registry.createRun(42, sim.SimParams{ .n_hats = 10 });
+    _ = try add(allocator, run, .{
+        .runId = run.run_id, .analystId = "analyst-1",
+        .requests = &.{
+            protocol.DefaultIbRequest{ .method = "ib.capabilities", .args = std.json.Value{ .null = {} } },
+            protocol.DefaultIbRequest{ .method = "ib.last_location", .args = std.json.Value{ .null = {} } },
+        },
+    });
+    const remove_resp = try remove(run, .{
+        .runId = run.run_id, .analystId = "analyst-1",
+        .requests = &.{protocol.DefaultIbRequest{ .method = "ib.capabilities", .args = std.json.Value{ .null = {} } }},
+    });
+    try std.testing.expectEqual(@as(u64, 1), remove_resp.totalDefaults);
+    const list_resp = try list(allocator, run, .{ .runId = run.run_id, .analystId = "analyst-1" });
+    defer {
+        for (list_resp.requests) |r| json_util.jsonValueDeinit(allocator, &r.args);
+        allocator.free(list_resp.requests);
+    }
+    try std.testing.expectEqual(@as(usize, 1), list_resp.requests.len);
+    try std.testing.expectEqualStrings("ib.last_location", list_resp.requests[0].method);
+}
+
+test "defaults.clear removes all defaults for analyst" {
+    const allocator = std.testing.allocator;
+    var registry = sim.initForTesting(allocator);
+    defer registry.deinit();
+    const run = try registry.createRun(42, sim.SimParams{ .n_hats = 10 });
+    _ = try add(allocator, run, .{
+        .runId = run.run_id, .analystId = "analyst-1",
+        .requests = &.{
+            protocol.DefaultIbRequest{ .method = "ib.capabilities", .args = std.json.Value{ .null = {} } },
+            protocol.DefaultIbRequest{ .method = "ib.last_location", .args = std.json.Value{ .null = {} } },
+        },
+    });
+    const clear_resp = try clear(run, .{ .runId = run.run_id, .analystId = "analyst-1" });
+    try std.testing.expectEqual(@as(u64, 0), clear_resp.totalDefaults);
+    const list_resp = try list(allocator, run, .{ .runId = run.run_id, .analystId = "analyst-1" });
+    defer allocator.free(list_resp.requests);
+    try std.testing.expectEqual(@as(usize, 0), list_resp.requests.len);
+}
+
+test "defaults.getDefaults returns empty slice for unknown analyst" {
+    const allocator = std.testing.allocator;
+    var registry = sim.initForTesting(allocator);
+    defer registry.deinit();
+    const run = try registry.createRun(42, sim.SimParams{ .n_hats = 10 });
+    const stored = getDefaults(run, "unknown-analyst");
+    try std.testing.expectEqual(@as(usize, 0), stored.len);
+}
+
+test "defaults.add with no requests returns zero" {
+    const allocator = std.testing.allocator;
+    var registry = sim.initForTesting(allocator);
+    defer registry.deinit();
+    const run = try registry.createRun(42, sim.SimParams{ .n_hats = 10 });
+    const resp = try add(allocator, run, .{
+        .runId = run.run_id, .analystId = "analyst-1", .requests = &.{},
+    });
+    try std.testing.expectEqual(@as(u64, 0), resp.totalDefaults);
+}

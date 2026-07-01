@@ -81,3 +81,79 @@ pub fn parseJsonValue(allocator: std.mem.Allocator, json_bytes: []const u8) !std
     defer parsed.deinit();
     return try jsonValueClone(allocator, &parsed.value);
 }
+
+// ── Tests ──────────────────────────────────────────────────────────
+
+test "stringifyAlloc and parseJsonValue round-trip scalar types" {
+    const allocator = std.testing.allocator;
+    const value = std.json.Value{ .integer = 42 };
+    const json_bytes = try stringifyAlloc(allocator, value);
+    defer allocator.free(json_bytes);
+    const parsed = try parseJsonValue(allocator, json_bytes);
+    defer jsonValueDeinit(allocator, &parsed);
+    try std.testing.expectEqual(@as(std.json.Value, .{ .integer = 42 }), parsed);
+}
+
+test "stringifyAlloc and parseJsonValue round-trip struct with nested arrays" {
+    const allocator = std.testing.allocator;
+    const TestStruct = struct {
+        name: []const u8,
+        values: []const i32,
+        flag: bool,
+    };
+    const ts = TestStruct{ .name = "hello", .values = &.{ 1, 2, 3 }, .flag = true };
+    const json_text = try stringifyAlloc(allocator, ts);
+    defer allocator.free(json_text);
+    const parsed = try parseJsonValue(allocator, json_text);
+    defer jsonValueDeinit(allocator, &parsed);
+    try std.testing.expect(parsed == .object);
+    try std.testing.expectEqual(@as(usize, 3), parsed.object.get("values").?.array.items.len);
+    try std.testing.expectEqual(@as(i64, 1), parsed.object.get("values").?.array.items[0].integer);
+    try std.testing.expectEqual(@as(i64, 2), parsed.object.get("values").?.array.items[1].integer);
+    try std.testing.expectEqual(@as(i64, 3), parsed.object.get("values").?.array.items[2].integer);
+    try std.testing.expectEqualStrings("hello", parsed.object.get("name").?.string);
+    try std.testing.expectEqual(true, parsed.object.get("flag").?.bool);
+}
+
+test "jsonValueClone deep-copy is independent of original" {
+    const allocator = std.testing.allocator;
+    var arr = std.json.Array.init(allocator);
+    try arr.append(std.json.Value{ .integer = 1 });
+    try arr.append(std.json.Value{ .integer = 2 });
+    try arr.append(std.json.Value{ .integer = 3 });
+    var orig_obj = try std.json.ObjectMap.init(allocator, &.{}, &.{});
+    try orig_obj.put(allocator, "key", std.json.Value{ .array = arr });
+    const original = std.json.Value{ .object = orig_obj };
+    const cloned = try jsonValueClone(allocator, &original);
+    defer jsonValueDeinit(allocator, &cloned);
+    // Clean up original: free the inner array before deiniting the object map
+    {
+        var arr_val = &orig_obj.get("key").?.array;
+        arr_val.deinit();
+    }
+    orig_obj.deinit(allocator);
+    try std.testing.expect(cloned == .object);
+    try std.testing.expectEqual(@as(usize, 3), cloned.object.get("key").?.array.items.len);
+    try std.testing.expectEqual(@as(i64, 1), cloned.object.get("key").?.array.items[0].integer);
+}
+
+test "jsonValueDeinit does not double-free on nested object with multiple keys" {
+    const allocator = std.testing.allocator;
+
+    // Create a nested value via jsonValueClone, then deinit it.
+    // If jsonValueDeinit double-frees, std.testing.allocator catches it.
+    const source = try parseJsonValue(allocator, "{\"a\":{\"b\":[1]},\"c\":\"str\"}");
+    const value = try jsonValueClone(allocator, &source);
+    jsonValueDeinit(allocator, &value);
+    jsonValueDeinit(allocator, &source);
+}
+
+test "jsonValueDeinit correctly frees object keys (regression: t_c262ce43)" {
+    const allocator = std.testing.allocator;
+    var obj = try std.json.ObjectMap.init(allocator, &.{}, &.{});
+    try obj.put(allocator, try allocator.dupe(u8, "alpha"), std.json.Value{ .integer = 1 });
+    try obj.put(allocator, try allocator.dupe(u8, "beta"), std.json.Value{ .integer = 2 });
+    const value = std.json.Value{ .object = obj };
+    var mutable = value;
+    jsonValueDeinit(allocator, &mutable);
+}

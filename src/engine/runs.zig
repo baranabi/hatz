@@ -44,3 +44,49 @@ pub const Runs = struct {
         return self.map.get(run_id);
     }
 };
+
+// ── Tests ──────────────────────────────────────────────────────────
+
+test "Runs init and createRun produce unique IDs" {
+    const allocator = std.testing.allocator;
+    var registry = Runs.init(allocator);
+    defer registry.deinit();
+
+    const params = sim.SimParams{ .n_hats = 10, .n_benign_orgs = 1, .n_terrorist_orgs = 1 };
+    const run_a = try registry.createRun(42, params);
+    const run_b = try registry.createRun(42, params);
+    try std.testing.expect(!std.mem.eql(u8, run_a.run_id, run_b.run_id));
+    try std.testing.expect(run_a.seed == 42);
+    try std.testing.expect(run_b.seed == 42);
+    try std.testing.expect(run_a.params.n_hats == 10);
+}
+
+test "Runs get returns null for missing run" {
+    const allocator = std.testing.allocator;
+    var registry = Runs.init(allocator);
+    defer registry.deinit();
+
+    try std.testing.expect(registry.get("nonexistent-run") == null);
+}
+
+test "Runs get returns created run by ID" {
+    const allocator = std.testing.allocator;
+    var registry = Runs.init(allocator);
+    defer registry.deinit();
+
+    const params = sim.SimParams{ .n_hats = 10, .n_benign_orgs = 1, .n_terrorist_orgs = 1 };
+    const created = try registry.createRun(42, params);
+    const looked_up = registry.get(created.run_id) orelse return error.TestFailed;
+    try std.testing.expectEqual(created, looked_up);
+    try std.testing.expectEqual(created.seed, looked_up.seed);
+}
+
+test "Runs deinit reclaims all memory (no leaks)" {
+    const allocator = std.testing.allocator;
+    var registry = Runs.init(allocator);
+    const params = sim.SimParams{ .n_hats = 10, .n_benign_orgs = 1, .n_terrorist_orgs = 1 };
+    _ = try registry.createRun(42, params);
+    _ = try registry.createRun(99, params);
+    registry.deinit();
+    // If deinit leaks, std.testing.allocator will report it after test scope.
+}

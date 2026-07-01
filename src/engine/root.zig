@@ -30,6 +30,7 @@ comptime {
     _ = @import("meetings.zig");
     _ = @import("attack.zig");
     _ = @import("json_util.zig");
+    _ = @import("router.zig");
     _ = @import("movement.zig");
     _ = @import("verif_paid_queries.zig");
 }
