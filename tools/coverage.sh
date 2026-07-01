@@ -54,7 +54,7 @@ echo "Building test executables..."
 
 # Find test binaries (two: mod_tests + exe_tests)
 echo "Finding test binaries..."
-TEST_BINS=$(find .zig-cache -name "test" -type f -perm +111 2>/dev/null \
+TEST_BINS=$(find .zig-cache -name "test" -type f -perm -111 2>/dev/null \
     | sort -t'/' -k7 -r | head -2 || true)
 
 if [ -z "$TEST_BINS" ]; then

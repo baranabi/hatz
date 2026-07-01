@@ -86,8 +86,12 @@ jobs:
           echo "=== coverage/ directory ==="
           if [ -d coverage ]; then
             echo "EXISTS:"
+            ls -la coverage/
             find coverage/ -type f | sort
             echo "FILES: $(find coverage/ -type f | wc -l | tr -d ' ')"
+            echo "=== Summary ==="
+            cat coverage/summary.txt 2>/dev/null || echo "(no summary.txt)"
+            head -100 coverage/index.html 2>/dev/null || echo "(no index.html)"
           else
             echo "MISSING: coverage/ directory does not exist"
             echo "=== Debug artifact contents ==="
@@ -97,6 +101,8 @@ jobs:
             ldd "$(which kcov)" 2>&1 | head -20
             echo "=== zig-cache test bins ==="
             find .zig-cache -name "test" -type f 2>/dev/null | head -5
+            echo "=== zig-cache ls ==="
+            ls -la .zig-cache/o/ 2>/dev/null | head -5
           fi
       - name: Upload coverage debug log (always)
         if: always()
@@ -109,5 +115,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: coverage/
+          path: coverage/**
           retention-days: 14
