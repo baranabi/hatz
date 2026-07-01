@@ -74,14 +74,18 @@ jobs:
       - name: Debug coverage directory contents
         continue-on-error: true
         run: |
-          echo "=== coverage dir tree ==="
-          find coverage/ -type f | sort
-          echo "=== coverage dir size ==="
-          du -sh coverage/
-          echo "=== cobertura search ==="
-          find coverage/ -name 'cobertura*' -o -name '*.xml' -o -name '*.json' 2>/dev/null | head -20
-          echo "=== kcov version ==="
-          kcov --version
+          {
+            echo "### Debug: coverage directory"
+            echo '```'
+            find coverage/ -type f | sort
+            echo "---"
+            find coverage/ -name '*.xml' -o -name '*.json' -o -name '*.html' -o -name 'metadata' 2>/dev/null | sort
+            echo "---"
+            du -sh coverage/
+            echo "---"
+            kcov --version
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
