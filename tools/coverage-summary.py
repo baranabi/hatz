@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Generate a coverage step summary from kcov's index.html and write to GITHUB_STEP_SUMMARY.
-Also generate cobertura.xml for Codecov upload."""
+Also generate cobertura.xml for Codecov upload.
+
+This script never exits with a non-zero code — the CI step has continue-on-error: true
+as a belt, but we treat errors as non-fatal here too."""
 
 import os
 import re
@@ -58,18 +61,20 @@ def write_cobertura_xml(files: list, output_path: str, source_dir: str = "."):
     """Generate a Cobertura XML from parsed coverage data."""
     total_lines = sum(f[1] for f in files)
     total_covered = sum(f[2] for f in files)
+    total_rate = total_covered / total_lines if total_lines > 0 else 0.0
+
     # Group files by package (directory)
     packages: dict[str, list] = {}
     for name, l, c, m, pct in files:
         pkg = os.path.dirname(name).replace("/", ".")
-        if pkg == "":
+        if not pkg:
             pkg = "root"
         if pkg not in packages:
             packages[pkg] = []
         packages[pkg].append((name, l, c, m, pct))
 
     coverage_elem = ET.Element("coverage")
-    coverage_elem.set("line-rate", str(total_covered / total_lines) if total_lines > 0 else "0")
+    coverage_elem.set("line-rate", str(total_rate))
     coverage_elem.set("branch-rate", "0")
     coverage_elem.set("lines-covered", str(total_covered))
     coverage_elem.set("lines-valid", str(total_lines))
@@ -104,31 +109,32 @@ def write_cobertura_xml(files: list, output_path: str, source_dir: str = "."):
             cls_elem.set("complexity", "0")
             methods_elem = ET.SubElement(cls_elem, "methods")
             lines_elem = ET.SubElement(cls_elem, "lines")
-            # Add a summary line for the whole file (no per-line data from kcov HTML)
+            # Per-file aggregated summary (no per-line data from kcov HTML)
+            # Codecov accepts this minimal format
             line_elem = ET.SubElement(lines_elem, "line")
             line_elem.set("number", "1")
             line_elem.set("hits", str(c))
             line_elem.set("branch", "false")
 
-    # Pretty-print
     rough = ET.tostring(coverage_elem, encoding="unicode")
     dom = minidom.parseString(rough)
     pretty = dom.toprettyxml(indent="  ")
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as f:
         f.write(pretty)
-    print(f"Wrote Cobertura XML ({len(files)} files) to {output_path}")
+    print(f"Wrote Cobertura XML ({len(files)} files, {total_covered}/{total_lines} lines covered, {total_rate:.1%}) to {output_path}")
 
 
 def main() -> None:
-    try:
-        index_path = "coverage/index.html"
-        if not os.path.exists(index_path):
-            print(f"{index_path} not found -- skipping coverage output", file=sys.stderr)
-            return
+    index_path = "coverage/index.html"
+    if not os.path.exists(index_path):
+        print(f"coverage-summary.py: {index_path} not found -- skipping", file=sys.stderr)
+        return
 
+    try:
         files = parse_coverage_html(index_path)
         if not files:
-            print("No coverage rows found in index.html", file=sys.stderr)
+            print("coverage-summary.py: no coverage rows found in index.html", file=sys.stderr)
             return
 
         # Write GitHub step summary
@@ -136,14 +142,13 @@ def main() -> None:
         if summary_file:
             write_step_summary(files, summary_file)
         else:
-            print("GITHUB_STEP_SUMMARY not set (not in CI) -- skipping step summary", file=sys.stderr)
+            print("coverage-summary.py: GITHUB_STEP_SUMMARY not set (not in CI) -- skipping step summary", file=sys.stderr)
 
         # Write Cobertura XML for Codecov
-        cobertura_path = "coverage/cobertura.xml"
-        write_cobertura_xml(files, cobertura_path)
+        write_cobertura_xml(files, "coverage/cobertura.xml")
     except Exception as e:
-        # Never fail the CI step — this is a supplementary script
-        print(f"coverage-summary error (non-fatal): {e}", file=sys.stderr)
+        # Never fail — supplementary script
+        print(f"coverage-summary.py error (non-fatal): {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":

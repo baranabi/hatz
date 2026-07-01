@@ -68,9 +68,11 @@ jobs:
           kcov --version
       - name: Run coverage
         run: bash tools/coverage.sh
-      - name: Generate coverage step summary
+      - name: Generate coverage step summary and Cobertura XML
+        continue-on-error: true
         run: python3 tools/coverage-summary.py
       - name: Debug coverage directory contents
+        continue-on-error: true
         run: |
           echo "=== coverage dir tree ==="
           find coverage/ -type f | sort
@@ -84,7 +86,6 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           files: ./coverage/cobertura.xml
-          directory: ./coverage
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
