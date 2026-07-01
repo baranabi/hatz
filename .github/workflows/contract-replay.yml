@@ -62,6 +62,15 @@ jobs:
           make -j"$(nproc)"
           sudo make install
           sudo ldconfig
+      - name: kcov ptrace check
+        run: |
+          echo "=== ptrace_scope ==="
+          cat /proc/sys/kernel/yama/ptrace_scope 2>/dev/null || echo "(not available)"
+          echo "=== Direct kcov test ==="
+          TD=$(mktemp -d)
+          kcov --clean "$TD" /bin/true 2>&1; echo "exit=$?"
+          ls -la "$TD" 2>&1 || echo "(no output)"
+          rm -rf "$TD"
       - name: Verify kcov
         run: |
           which kcov
