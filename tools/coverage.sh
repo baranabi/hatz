@@ -13,16 +13,25 @@ if [ ! -x "$ZIG" ]; then
     exit 1
 fi
 
-# Install kcov if missing
-if ! command -v kcov &>/dev/null; then
+# Determine kcov binary (KCOV env var overrides PATH lookup)
+KCOV_BIN="${KCOV:-}"
+if [ -z "$KCOV_BIN" ] && command -v kcov &>/dev/null; then
+    KCOV_BIN="kcov"
+fi
+
+# Install kcov if missing (local dev only — CI pre-installs)
+if [ -z "$KCOV_BIN" ]; then
     echo "Installing kcov via brew..."
     brew install kcov
+    if command -v kcov &>/dev/null; then
+        KCOV_BIN="kcov"
+    fi
 fi
 
 # Check kcov availability
 KCOV_VERSION=""
-if command -v kcov &>/dev/null; then
-    KCOV_VERSION=$(kcov --version 2>&1 | head -1) || true
+if [ -n "$KCOV_BIN" ] && [ -x "$KCOV_BIN" -o "$KCOV_BIN" = "kcov" ]; then
+    KCOV_VERSION=$("$KCOV_BIN" --version 2>&1 | head -1) || true
 fi
 
 if [ -z "$KCOV_VERSION" ]; then
@@ -69,7 +78,7 @@ echo "Found $(echo "$TEST_BINS" | wc -l | tr -d ' ') test binary(ies)."
 # (cobertura.xml + cov.xml) at the output directory root.
 for bin in $TEST_BINS; do
     echo "  kcov: $(basename "$(dirname "$bin")")..."
-    kcov \
+    "$KCOV_BIN" \
         --include-pattern=src/engine \
         --exclude-pattern=zig-cache \
         --skip-solibs \

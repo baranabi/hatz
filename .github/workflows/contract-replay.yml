@@ -37,7 +37,7 @@ jobs:
     continue-on-error: true  # non-blocking — step summary & artifact survive
     permissions:
       contents: read
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,15 +45,24 @@ jobs:
         uses: mlugg/setup-zig@v2
         with:
           version: 0.16.0
-      - name: Install kcov
+      - name: Install zig-kcov
         run: |
-          brew install kcov
-          # kcov on macOS needs ad-hoc codesigning for ptrace debugging
-          KCOV_BIN=$(brew --prefix kcov)/bin/kcov
-          if [ -f "$KCOV_BIN" ]; then
-            codesign --entitlements "$(brew --prefix kcov)/share/kcov/osx-entitlements.xml" \
-              --force -s - "$KCOV_BIN" 2>/dev/null || true
+          # Use roc-lang/zig-kcov fork — handles Zig DWARF properly
+          # (standard kcov breaks on Linux due to DWARF/ELF issues with Zig output)
+          KCOV_VERSION="v42.0.1"
+          curl -sL "https://github.com/roc-lang/zig-kcov/releases/download/${KCOV_VERSION}/kcov-x86_64-linux.tar.gz" \
+            | tar xz -C /tmp
+          # Binary is at /tmp/kcov-x86_64-linux/bin/kcov (or similar) — find it
+          KCOV_BIN=$(find /tmp -name kcov -type f -perm -111 | head -1)
+          if [ -z "$KCOV_BIN" ]; then
+            echo "ERROR: kcov binary not found after extraction" >&2
+            find /tmp -maxdepth 3 -type f | head -20
+            exit 1
           fi
+          chmod +x "$KCOV_BIN"
+          echo "KCOV=$KCOV_BIN" >> "$GITHUB_ENV"
+          echo "Installed zig-kcov at $KCOV_BIN"
+          "$KCOV_BIN" --version 2>&1 || true
       - name: Run coverage
         timeout-minutes: 5
         run: bash tools/coverage.sh
