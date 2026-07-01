@@ -74,11 +74,17 @@ jobs:
           python3 tools/coverage-summary.py
       - name: Verify Cobertura XML exists
         run: |
+          echo "### Coverage output files" >> "$GITHUB_STEP_SUMMARY"
+          ls -la coverage/cobertura.xml coverage/cov.xml 2>&1 || true
           if [ -f coverage/cobertura.xml ]; then
             echo "coverage/cobertura.xml exists ($(wc -c < coverage/cobertura.xml) bytes)"
+            echo "Coverage files in coverage/:" >> "$GITHUB_STEP_SUMMARY"
+            ls -la coverage/cobertura.xml coverage/cov.xml coverage/index.html >> "$GITHUB_STEP_SUMMARY" 2>&1 || true
+          elif [ -f coverage/cov.xml ]; then
+            echo "coverage/cov.xml exists ($(wc -c < coverage/cov.xml) bytes) — using for Codecov"
+            cp coverage/cov.xml coverage/cobertura.xml
           else
-            echo "ERROR: coverage/cobertura.xml not found — kcov --cobertura-only likely failed"
-            echo "Files in coverage/:"
+            echo "ERROR: no Cobertura XML found in coverage/. Files:"
             find coverage/ -type f | sort
             exit 1
           fi
