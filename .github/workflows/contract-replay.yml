@@ -74,10 +74,40 @@ jobs:
           python3 tools/coverage-summary.py
       - name: Generate Cobertura XML for Codecov
         run: |
-          python3 tools/cobertura-gen.py
-          echo "### Cobertura XML" >> "$GITHUB_STEP_SUMMARY"
-          wc -c coverage/cobertura.xml >> "$GITHUB_STEP_SUMMARY"
-          head -3 coverage/cobertura.xml >> "$GITHUB_STEP_SUMMARY"
+          echo "### Cobertura XML generation" >> "$GITHUB_STEP_SUMMARY"
+          # Use kcov's --report-only --cobertura-only to regenerate Cobertura XML
+          # from the stored coverage data in each binary's subdirectory.
+          # kcov --report-only reads summary.db from subdirectories and regenerates
+          # the report. With --cobertura-only it outputs cov.xml (not cobertura.xml).
+          for subdir in coverage/*/; do
+            if [ -f "${subdir}summary.db" ]; then
+              echo "Regenerating from ${subdir}..." >> "$GITHUB_STEP_SUMMARY"
+              kcov --report-only --cobertura-only "$subdir" 2>&1 || true
+            fi
+          done
+          # Copy any generated cov.xml to the expected location
+          for covfile in coverage/*/cov.xml; do
+            if [ -f "$covfile" ]; then
+              cp "$covfile" coverage/cobertura.xml
+              echo "Copied $covfile to coverage/cobertura.xml" >> "$GITHUB_STEP_SUMMARY"
+              break
+            fi
+          done
+          if [ ! -f coverage/cobertura.xml ]; then
+            echo "No cov.xml found — trying kcov on root directory" >> "$GITHUB_STEP_SUMMARY"
+            kcov --report-only --cobertura-only coverage/ 2>&1 || true
+            if [ -f coverage/cov.xml ]; then
+              cp coverage/cov.xml coverage/cobertura.xml
+            fi
+          fi
+          # Final check
+          if [ -f coverage/cobertura.xml ]; then
+            echo "coverage/cobertura.xml: $(wc -c < coverage/cobertura.xml) bytes" >> "$GITHUB_STEP_SUMMARY"
+            head -5 coverage/cobertura.xml >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "WARNING: no Cobertura XML generated — adding placeholder" >> "$GITHUB_STEP_SUMMARY"
+            echo '<?xml version="1.0" ?><coverage></coverage>' > coverage/cobertura.xml
+          fi
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
