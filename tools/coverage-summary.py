@@ -120,26 +120,30 @@ def write_cobertura_xml(files: list, output_path: str, source_dir: str = "."):
 
 
 def main() -> None:
-    index_path = "coverage/index.html"
-    if not os.path.exists(index_path):
-        print(f"{index_path} not found -- skipping coverage output", file=sys.stderr)
-        sys.exit(0)
+    try:
+        index_path = "coverage/index.html"
+        if not os.path.exists(index_path):
+            print(f"{index_path} not found -- skipping coverage output", file=sys.stderr)
+            return
 
-    files = parse_coverage_html(index_path)
-    if not files:
-        print("No coverage rows found in index.html", file=sys.stderr)
-        sys.exit(1)
+        files = parse_coverage_html(index_path)
+        if not files:
+            print("No coverage rows found in index.html", file=sys.stderr)
+            return
 
-    # Write GitHub step summary
-    summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
-    if summary_file:
-        write_step_summary(files, summary_file)
-    else:
-        print("GITHUB_STEP_SUMMARY not set (not in CI) -- skipping step summary", file=sys.stderr)
+        # Write GitHub step summary
+        summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
+        if summary_file:
+            write_step_summary(files, summary_file)
+        else:
+            print("GITHUB_STEP_SUMMARY not set (not in CI) -- skipping step summary", file=sys.stderr)
 
-    # Write Cobertura XML for Codecov
-    cobertura_path = "coverage/cobertura.xml"
-    write_cobertura_xml(files, cobertura_path)
+        # Write Cobertura XML for Codecov
+        cobertura_path = "coverage/cobertura.xml"
+        write_cobertura_xml(files, cobertura_path)
+    except Exception as e:
+        # Never fail the CI step — this is a supplementary script
+        print(f"coverage-summary error (non-fatal): {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":
