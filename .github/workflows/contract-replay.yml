@@ -52,13 +52,20 @@ jobs:
             libdw-dev libiberty-dev
       - name: Build kcov from source
         run: |
-          git clone --depth 1 --branch v43 \
+          git clone --depth 1 \
             https://github.com/SimonKagstrom/kcov.git /tmp/kcov-src
           cd /tmp/kcov-src
           mkdir -p build && cd build
-          cmake -DCMAKE_BUILD_TYPE=Release ..
+          cmake -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr ..
           make -j"$(nproc)"
           sudo make install
+          sudo ldconfig
+      - name: Verify kcov
+        run: |
+          which kcov
+          kcov --version
+          ldd "$(which kcov)" | head -20
       - name: Run coverage
         run: bash tools/coverage.sh
       - name: Upload coverage report
