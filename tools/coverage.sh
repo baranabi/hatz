@@ -47,16 +47,15 @@ rm -rf coverage/
 
 # Build test executables
 echo "Building test executables..."
-BUILD_MARKER=$(mktemp /tmp/hatz-build-start.XXXXXX)
 "$ZIG" build test 2>&1 || {
     echo "ERROR: zig build test failed" >&2
     exit 1
 }
 
-# Find test binaries built just now (newer than marker)
+# Find test binaries (two: mod_tests + exe_tests)
 echo "Finding test binaries..."
-TEST_BINS=$(find .zig-cache -name "test" -type f -perm -111 -newer "$BUILD_MARKER" 2>/dev/null | sort -u || true)
-rm -f "$BUILD_MARKER"
+TEST_BINS=$(find .zig-cache -name "test" -type f -perm -111 2>/dev/null \
+    | sort -t'/' -k7 -r | head -2 || true)
 
 if [ -z "$TEST_BINS" ]; then
     echo "ERROR: no test binaries found. Did zig build test succeed?" >&2
@@ -76,22 +75,6 @@ for bin in $TEST_BINS; do
         "$bin" \
         2>&1 | grep -v 'kcov: debug: ' || true
 done
-
-# Remove empty test entries from merged index (those with 0 instrumented lines)
-MERGED_JS="coverage/index.js"
-if [ -f "$MERGED_JS" ]; then
-    sed -i '' '/"total_lines"[[:space:]]*:[[:space:]]*"0"/d' "$MERGED_JS" 2>/dev/null || true
-    sed -i '' 's/,\s*\]/]/' "$MERGED_JS" 2>/dev/null || true
-fi
-
-# Patch kcov.js to handle 0/0 (NaN) when no lines instrumented
-KCOV_JS="coverage/data/js/kcov.js"
-if [ -f "$KCOV_JS" ]; then
-    # Fix header percent calculation
-    sed -i '' 's|elem.innerHTML = ((header.covered / header.instrumented) \* 100).toFixed(1) + "%";|if (header.instrumented > 0) {\n\t\telem.className = toCoverPercentString(header.covered, header.instrumented);\n\t\telem.innerHTML = ((header.covered / header.instrumented) * 100).toFixed(1) + "%";\n\t} else {\n\t\telem.className = "coverPerLeftLo";\n\t\telem.innerHTML = "N/A";\n\t}|' "$KCOV_JS" 2>/dev/null || true
-    # Fix toCoverPercentString for zero instrumented
-    sed -i '' 's|function toCoverPercentString (covered, instrumented) {|function toCoverPercentString (covered, instrumented) {\n\tif (instrumented === 0) return "coverPerLeftLo";|' "$KCOV_JS" 2>/dev/null || true
-fi
 
 # Verify output
 REPORT="coverage/index.html"
