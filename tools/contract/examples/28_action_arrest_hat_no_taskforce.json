@@ -1,0 +1,14 @@
+{
+  "contractVersion": "1.0.0",
+  "type": "action.arrest_hat",
+  "requestId": "req-28-action-arrest-hat-no-taskforce",
+  "payload": {
+    "runId": "run-99999-2",
+    "analystId": "human",
+    "hatId": 0,
+    "location": {
+      "x": 10,
+      "y": 10
+    }
+  }
+}

@@ -1,1 +1,1 @@
-{"contractVersion":"1.0.0","ok":true,"payload":{"method":"ib.last_location","charged":10,"result":{"location":{"x":30,"y":38}},"metadata":{"tick":1,"noisy":false}},"error":null,"requestId":"req-05-broker-last-location"}
+{"contractVersion":"1.0.0","ok":true,"payload":{"method":"ib.last_location","charged":10,"result":{"location":{"x":30,"y":38}},"metadata":{"tick":1,"noisy":true}},"error":null,"requestId":"req-05-broker-last-location"}

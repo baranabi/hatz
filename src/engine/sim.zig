@@ -356,7 +356,7 @@ pub fn advance(registry: *runs.Runs, allocator: std.mem.Allocator, payload: SimA
             );
         }
         // Run organization planner each tick (only effective on planning_interval ticks).
-        try planner.plan(run.allocator, run.seed, run.params.planning_interval, tick, run.organizations, run.beacons[0..], &run.taskforces, &run.event_log);
+        try planner.plan(run.allocator, run.seed, run.params.planning_interval, tick, run.organizations, run.beacons[0..], run.hat_states, &run.taskforces, &run.event_log);
         // Execute any meetings scheduled at this tick.
         try meetings.executeMeetings(run, tick);
     }
@@ -456,18 +456,22 @@ pub fn end(registry: *runs.Runs, allocator: std.mem.Allocator, payload: SimEndRe
         });
     }
 
+    const beacon_eff_slice = try beacon_eff_list.toOwnedSlice(allocator);
+    defer allocator.free(beacon_eff_slice);
     const summary_data = SummaryData{
         .informationCost = info_cost,
         .falseArrests = run.false_arrests,
-        .beaconEffectiveness = try beacon_eff_list.toOwnedSlice(allocator),
+        .beaconEffectiveness = beacon_eff_slice,
         .totalTicks = @as(i64, @intCast(run.tick)),
         .attacksAttempted = run.attacks_at_level_off + run.attacks_at_level_one + run.attacks_at_level_two,
         .attacksSucceeded = run.attacks_at_level_off,
         .attacksPreventedByAlert = run.attacks_at_level_one + run.attacks_at_level_two,
     };
     const json_text = try json_util.stringifyAlloc(allocator, summary_data);
+    defer allocator.free(json_text);
     const parsed = try std.json.parseFromSlice(std.json.Value, allocator, json_text, .{ .allocate = .alloc_always });
-    const summary_value = parsed.value;
+    defer parsed.deinit();
+    const summary_value = try json_util.jsonValueClone(allocator, &parsed.value);
 
     return SimEndResponsePayload{
         .runId = run.run_id,
@@ -545,6 +549,7 @@ test "SimParams empty object uses all defaults" {
 
 test "SimParams partial override preserves remaining defaults" {
     var obj = std.json.ObjectMap{};
+    defer obj.deinit(std.testing.allocator);
     try obj.put(std.testing.allocator, "n_hats", std.json.Value{ .integer = 50 });
     const partial = std.json.Value{ .object = obj };
     const p = parseSimParams(partial);
@@ -562,6 +567,7 @@ test "SimParams non-object value returns all defaults" {
 
 test "SimParams all fields explicit are parsed correctly" {
     var obj = std.json.ObjectMap{};
+    defer obj.deinit(std.testing.allocator);
     try obj.put(std.testing.allocator, "n_hats", std.json.Value{ .integer = 100 });
     try obj.put(std.testing.allocator, "n_benign_orgs", std.json.Value{ .integer = 5 });
     try obj.put(std.testing.allocator, "n_terrorist_orgs", std.json.Value{ .integer = 3 });
@@ -584,12 +590,16 @@ test "advance(50) creates taskforces with valid meetings from both org types" {
     const allocator = std.testing.allocator;
 
     var params = std.json.ObjectMap{};
+    defer params.deinit(allocator);
     try params.put(allocator, "n_hats", std.json.Value{ .integer = 200 });
     try params.put(allocator, "n_benign_orgs", std.json.Value{ .integer = 4 });
     try params.put(allocator, "n_terrorist_orgs", std.json.Value{ .integer = 2 });
     try params.put(allocator, "planning_interval", std.json.Value{ .integer = 10 });
     var tr = try initTestRunWithParams(allocator, params);
-    defer tr.registry.deinit();
+    defer {
+        tr.registry.deinit();
+        allocator.destroy(tr.registry);
+    }
 
     // Advance 50 ticks.
     const adv_resp = try advance(tr.registry, allocator, .{
@@ -635,11 +645,15 @@ test "end returns correct final tick and summary" {
     const allocator = std.testing.allocator;
 
     var params = std.json.ObjectMap{};
+    defer params.deinit(allocator);
     try params.put(allocator, "n_hats", std.json.Value{ .integer = 50 });
     try params.put(allocator, "n_benign_orgs", std.json.Value{ .integer = 2 });
     try params.put(allocator, "n_terrorist_orgs", std.json.Value{ .integer = 1 });
     var tr = try initTestRunWithParams(allocator, params);
-    defer tr.registry.deinit();
+    defer {
+        tr.registry.deinit();
+        allocator.destroy(tr.registry);
+    }
 
     // Advance 20 ticks.
     _ = try advance(tr.registry, allocator, .{
@@ -652,6 +666,7 @@ test "end returns correct final tick and summary" {
     const end_resp = try end(tr.registry, allocator, .{ .runId = tr.run_id });
     try std.testing.expectEqualStrings(tr.run_id, end_resp.runId);
     try std.testing.expectEqual(@as(u64, 20), end_resp.finalTick);
+    defer json_util.jsonValueDeinit(allocator, &end_resp.summary);
     _ = end_resp.summary; // summary should exist
 }
 
@@ -659,12 +674,16 @@ test "end returns complete scoring report with alert and arrest actions" {
     const allocator = std.testing.allocator;
 
     var params = std.json.ObjectMap{};
+    defer params.deinit(allocator);
     try params.put(allocator, "n_hats", std.json.Value{ .integer = 100 });
     try params.put(allocator, "n_benign_orgs", std.json.Value{ .integer = 3 });
     try params.put(allocator, "n_terrorist_orgs", std.json.Value{ .integer = 2 });
     try params.put(allocator, "planning_interval", std.json.Value{ .integer = 10 });
     var tr = try initTestRunWithParams(allocator, params);
-    defer tr.registry.deinit();
+    defer {
+        tr.registry.deinit();
+        allocator.destroy(tr.registry);
+    }
 
     const run = tr.run;
 
@@ -697,6 +716,7 @@ test "end returns complete scoring report with alert and arrest actions" {
 
     // End the run.
     const end_resp = try end(tr.registry, allocator, .{ .runId = tr.run_id });
+    defer json_util.jsonValueDeinit(allocator, &end_resp.summary);
     try std.testing.expectEqualStrings(tr.run_id, end_resp.runId);
     try std.testing.expect(end_resp.finalTick >= 50);
 
@@ -763,12 +783,16 @@ test "planner taskforce_created events match beacon locations (seed=42, 100 tick
     const allocator = std.testing.allocator;
 
     var params = std.json.ObjectMap{};
+    defer params.deinit(allocator);
     try params.put(allocator, "n_hats", std.json.Value{ .integer = 200 });
     try params.put(allocator, "n_benign_orgs", std.json.Value{ .integer = 3 });
     try params.put(allocator, "n_terrorist_orgs", std.json.Value{ .integer = 2 });
     try params.put(allocator, "planning_interval", std.json.Value{ .integer = 10 });
     var tr = try initTestRunWithParams(allocator, params);
-    defer tr.registry.deinit();
+    defer {
+        tr.registry.deinit();
+        allocator.destroy(tr.registry);
+    }
 
     const run = tr.run;
 
@@ -811,10 +835,14 @@ test "advance with 0 ticks does not change state" {
     const allocator = std.testing.allocator;
 
     var params = std.json.ObjectMap{};
+    defer params.deinit(allocator);
     try params.put(allocator, "n_hats", std.json.Value{ .integer = 50 });
     try params.put(allocator, "planning_interval", std.json.Value{ .integer = 10 });
     var tr = try initTestRunWithParams(allocator, params);
-    defer tr.registry.deinit();
+    defer {
+        tr.registry.deinit();
+        allocator.destroy(tr.registry);
+    }
 
     const run = tr.run;
     const events_before = run.event_log.items.len;
@@ -829,4 +857,138 @@ test "advance with 0 ticks does not change state" {
     try std.testing.expectEqual(@as(u64, 0), run.tick);
     try std.testing.expectEqual(events_before, run.event_log.items.len);
     try std.testing.expectEqual(tf_before, run.taskforces.items.len);
+}
+
+test "planner-generated taskforce attacks beacon via routed trades" {
+    // Integration test: proves that a planner-generated (not population-init)
+    // taskforce can successfully attack a beacon via the full pipeline:
+    // planner → generateMeetingTree with trades → meetings → attack detection.
+    //
+    // All hats have all 16 capabilities so any beacon's vulnerabilities
+    // are routable. The planner's generateMeetingTree creates trades for
+    // capabilities not innately held by taskforce members, routing them
+    // from non-member org hats at intermediate meetings.
+    const allocator = std.testing.allocator;
+
+    // Hats: 5 terrorist hats.
+    const n_hats: usize = 5;
+    const hats = try allocator.alloc(types.Hat, n_hats);
+    for (hats, 0..) |*hat, i| {
+        hat.* = .{ .id = @intCast(i), .true_color = .TERRORIST, .advertised_color = .UNKNOWN };
+    }
+
+    // Hat states: all hats have all 16 capabilities.
+    const hat_states = try allocator.alloc(types.HatState, n_hats);
+    for (hat_states) |*hs| {
+        hs.* = .{ .current_location = .{ .x = 5, .y = 5 }, .capability_bits = 0xFFFF };
+    }
+
+    // One terrorist org with all hats as members.
+    const n_orgs: usize = 1;
+    const orgs = try allocator.alloc(types.Organization, n_orgs);
+    orgs[0] = .{ .id = 0, .org_type = .TERRORIST, .members = try allocator.dupe(types.HatId, &.{ 0, 1, 2, 3, 4 }) };
+
+    // 5 beacons with standard deterministic vulnerabilities.
+    var beacons: [beacon_count]types.Beacon = undefined;
+    var beacon_vulns: [beacon_count][beacon_vuln_count]types.CapabilityId = undefined;
+    for (&beacons, 0..) |*b, i| {
+        beacon_vulns[i] = beaconVulnerabilities(42, @as(types.BeaconId, @intCast(i)));
+        b.* = .{
+            .beaconId = @intCast(i),
+            .alertLevel = .OFF,
+            .location = types.deterministicBeaconLocation(42, @as(types.BeaconId, @intCast(i))),
+        };
+    }
+
+    // RunState.
+    const taskforces = std.ArrayList(types.Taskforce).empty;
+    var state = RunState{
+        .allocator = allocator,
+        .run_id = try allocator.dupe(u8, "planner-attack-integration"),
+        .seed = 42,
+        .tick = 0,
+        .params = SimParams{ .planning_interval = 5 },
+        .analyst_states = std.StringHashMap(AnalystState).init(allocator),
+        .beacons = beacons,
+        .beacon_vulnerabilities = beacon_vulns,
+        .arrested_hats = std.AutoHashMap(types.HatId, bool).init(allocator),
+        .event_log = .empty,
+        .hat_states = hat_states,
+        .hats = hats,
+        .organizations = orgs,
+        .taskforces = taskforces,
+    };
+    defer {
+        for (state.taskforces.items) |tf| {
+            allocator.free(tf.members);
+            allocator.free(tf.required_capabilities);
+            for (tf.meeting_plan) |m| {
+                allocator.free(m.participants);
+                allocator.free(m.trades);
+            }
+            allocator.free(tf.meeting_plan);
+        }
+        state.taskforces.deinit(allocator);
+        for (state.organizations) |org| allocator.free(org.members);
+        allocator.free(state.organizations);
+        allocator.free(state.hats);
+        allocator.free(state.hat_states);
+        state.event_log.deinit(allocator);
+        state.analyst_states.deinit();
+        state.arrested_hats.deinit();
+        allocator.free(state.run_id);
+    }
+
+    // Generate taskforces via the planner at multiple planning-interval ticks.
+    // The deterministic 50% chance per tick means some ticks will produce a
+    // taskforce and some won't; trying multiple guarantees at least one hits.
+    const plan_ticks = [_]types.Tick{ 5, 10, 15, 20, 25, 30, 35, 40 };
+    inline for (plan_ticks) |pt| {
+        try planner.plan(
+            allocator, state.seed, state.params.planning_interval,
+            pt, state.organizations, state.beacons[0..],
+            state.hat_states, &state.taskforces, &state.event_log,
+        );
+    }
+    try std.testing.expect(state.taskforces.items.len > 0);
+
+    // Find a planner-created terrorist taskforce targeting a beacon.
+    var planner_tf_idx: ?usize = null;
+    for (state.taskforces.items, 0..) |tf, idx| {
+        if (tf.status != .ACTIVE) continue;
+        if (state.organizations[tf.organization_id].org_type != .TERRORIST) continue;
+        for (state.beacons) |b| {
+            if (tf.target.x == b.location.x and tf.target.y == b.location.y) {
+                planner_tf_idx = idx;
+                break;
+            }
+        }
+        if (planner_tf_idx != null) break;
+    }
+    try std.testing.expect(planner_tf_idx != null);
+
+    const tf_idx = planner_tf_idx.?;
+    const tf = &state.taskforces.items[tf_idx];
+
+    // Execute meetings tick by tick up through the final meeting.
+    var max_tick: types.Tick = 0;
+    for (tf.meeting_plan) |m| {
+        if (m.tick > max_tick) max_tick = m.tick;
+    }
+    max_tick += 1; // one extra tick so disband event is processed
+    var tick: types.Tick = 1;
+    while (tick <= max_tick) : (tick += 1) {
+        try meetings.executeMeetings(&state, tick);
+    }
+
+    // Verify attack event was recorded.
+    var found_attack = false;
+    for (state.event_log.items) |ev| {
+        if (std.mem.eql(u8, ev.type, types.event_type_attack)) {
+            try std.testing.expectEqual(@as(u32, @intCast(tf_idx)), ev.taskforceId.?);
+            found_attack = true;
+            break;
+        }
+    }
+    try std.testing.expect(found_attack);
 }

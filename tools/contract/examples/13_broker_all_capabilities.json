@@ -1,0 +1,11 @@
+{
+  "contractVersion": "1.0.0",
+  "type": "broker.call",
+  "requestId": "req-13-broker-all-capabilities",
+  "payload": {
+    "runId": "run-99999-2",
+    "analystId": "human",
+    "method": "ib.all_capabilities",
+    "args": {}
+  }
+}

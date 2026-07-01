@@ -181,10 +181,10 @@ pub fn call(allocator: std.mem.Allocator, run: *sim.RunState, payload: BrokerCal
         const nh = noiseHash(run.seed, tick, payload.method, payload.analystId);
         const outcome = noiseOutcome(nh, payment);
         const caps: []types.CapabilityId = switch (outcome) {
-            .correct => try hatCapabilities(allocator, @intCast(hat_id)),
+            .correct => try capabilitiesFromState(allocator, run.hat_states, @intCast(hat_id)),
             .missing => try allocator.alloc(types.CapabilityId, 0),
             .perturbed => blk: {
-                var c = try hatCapabilities(allocator, @intCast(hat_id));
+                var c = try capabilitiesFromState(allocator, run.hat_states, @intCast(hat_id));
                 if (c.len > 0) {
                     const rand_cap = @as(types.CapabilityId, @intCast(types.mix(nh ^ 0xBEEF) % 16));
                     c[0] = rand_cap;
@@ -212,10 +212,10 @@ pub fn call(allocator: std.mem.Allocator, run: *sim.RunState, payload: BrokerCal
         const nh = noiseHash(run.seed, tick, payload.method, payload.analystId);
         const outcome = noiseOutcome(nh, payment);
         const ticks: []types.Tick = switch (outcome) {
-            .correct => try meetingTimes(allocator, tick, @intCast(hat_id)),
+            .correct => try meetingTimesForHat(allocator, run.taskforces, @intCast(hat_id)),
             .missing => try allocator.alloc(types.Tick, 0),
             .perturbed => blk: {
-                var t = try meetingTimes(allocator, tick, @intCast(hat_id));
+                var t = try meetingTimesForHat(allocator, run.taskforces, @intCast(hat_id));
                 // Drop first tick if any exist (perturbed list).
                 if (t.len > 0) {
                     const trimmed = try allocator.alloc(types.Tick, t.len - 1);
@@ -265,11 +265,11 @@ pub fn call(allocator: std.mem.Allocator, run: *sim.RunState, payload: BrokerCal
     if (std.mem.eql(u8, payload.method, "ib.meeting_participants")) {
         const args = try requireObject(payload.args);
         const meeting_tick = try requireInt(args, "tick");
-        _ = try requireLocation(args, "location");
+        const meeting_location = try requireLocation(args, "location");
         const payment = try requireNumber(args, "payment");
-        const truth: ?[]types.HatId = if (meeting_tick % 3 == 0) try meetingParticipants(allocator, meeting_tick) else null;
         const nh = noiseHash(run.seed, tick, payload.method, payload.analystId);
         const outcome = noiseOutcome(nh, payment);
+        const truth: ?[]types.HatId = try findMeetingParticipants(allocator, run.taskforces, @intCast(meeting_tick), meeting_location);
         const participants: ?[]types.HatId = switch (outcome) {
             .correct => truth,
             .missing => null,
@@ -293,11 +293,11 @@ pub fn call(allocator: std.mem.Allocator, run: *sim.RunState, payload: BrokerCal
     if (std.mem.eql(u8, payload.method, "ib.meeting_trades")) {
         const args = try requireObject(payload.args);
         const meeting_tick = try requireInt(args, "tick");
-        _ = try requireLocation(args, "location");
+        const meeting_location = try requireLocation(args, "location");
         const payment = try requireNumber(args, "payment");
-        const truth: ?[]TradeRecord = if (meeting_tick % 4 == 0) try meetingTrades(allocator, meeting_tick) else null;
         const nh = noiseHash(run.seed, tick, payload.method, payload.analystId);
         const outcome = noiseOutcome(nh, payment);
+        const truth: ?[]TradeRecord = try findMeetingTrades(allocator, run.taskforces, @intCast(meeting_tick), meeting_location);
         const trades: ?[]TradeRecord = switch (outcome) {
             .correct => truth,
             .missing => null,
@@ -530,51 +530,66 @@ fn capabilityRange(allocator: std.mem.Allocator, count: u32) ![]types.Capability
     return list.toOwnedSlice(allocator);
 }
 
-/// Provide a deterministic capability list for a hat.
-fn hatCapabilities(allocator: std.mem.Allocator, hat_id: types.HatId) ![]types.CapabilityId {
+/// Read a hat's owned capabilities from its hat_state capability_bits bitmask.
+fn capabilitiesFromState(allocator: std.mem.Allocator, hat_states: []const types.HatState, hat_id: types.HatId) ![]types.CapabilityId {
+    if (hat_id >= hat_states.len) return try allocator.alloc(types.CapabilityId, 0);
+    const bits = hat_states[@as(usize, @intCast(hat_id))].capability_bits;
     var list: std.ArrayList(types.CapabilityId) = .empty;
-    var idx: u32 = 0;
-    while (idx < 3) : (idx += 1) {
-        try list.append(allocator, @intCast((hat_id + idx * 5) % 16));
-    }
-    return list.toOwnedSlice(allocator);
-}
-
-/// Generate deterministic meeting times starting from the current tick.
-/// This models sparse meetings without storing historical state.
-fn meetingTimes(allocator: std.mem.Allocator, current_tick: types.Tick, hat_id: types.HatId) ![]types.Tick {
-    var list: std.ArrayList(types.Tick) = .empty;
-    var t: types.Tick = current_tick;
-    while (t <= current_tick + 50) : (t += 1) {
-        if ((t + hat_id) % 13 == 0) {
-            try list.append(allocator, t);
+    var i: types.CapabilityId = 0;
+    while (i < 64) : (i += 1) {
+        if ((bits >> @as(u6, @intCast(i))) & 1 == 1) {
+            try list.append(allocator, i);
         }
     }
     return list.toOwnedSlice(allocator);
 }
 
-/// Return deterministic participant ids for a meeting tick.
-fn meetingParticipants(allocator: std.mem.Allocator, meeting_tick: types.Tick) ![]types.HatId {
-    var list: std.ArrayList(types.HatId) = .empty;
-    var idx: u32 = 0;
-    while (idx < 3) : (idx += 1) {
-        try list.append(allocator, @intCast((meeting_tick + idx * 7) % 64));
+/// Collect meeting ticks for all meetings where a given hat is a participant.
+fn meetingTimesForHat(allocator: std.mem.Allocator, taskforces: std.ArrayList(types.Taskforce), hat_id: types.HatId) ![]types.Tick {
+    var list: std.ArrayList(types.Tick) = .empty;
+    for (taskforces.items) |tf| {
+        for (tf.meeting_plan) |m| {
+            for (m.participants) |p| {
+                if (p == hat_id) {
+                    try list.append(allocator, m.tick);
+                    break;
+                }
+            }
+        }
     }
     return list.toOwnedSlice(allocator);
 }
 
-/// Return deterministic trade records for a meeting tick.
-fn meetingTrades(allocator: std.mem.Allocator, meeting_tick: types.Tick) ![]TradeRecord {
-    var list: std.ArrayList(TradeRecord) = .empty;
-    var idx: u32 = 0;
-    while (idx < 2) : (idx += 1) {
-        try list.append(allocator, .{
-            .sourceHatId = @intCast((meeting_tick + idx) % 64),
-            .recipientHatId = @intCast((meeting_tick + idx + 1) % 64),
-            .capabilityId = @intCast((meeting_tick + idx * 3) % 16),
-        });
+/// Find a meeting by tick + location and return an owned copy of its participants, or null.
+fn findMeetingParticipants(allocator: std.mem.Allocator, taskforces: std.ArrayList(types.Taskforce), meeting_tick: types.Tick, location: types.Location) !?[]types.HatId {
+    for (taskforces.items) |tf| {
+        for (tf.meeting_plan) |m| {
+            if (m.tick == meeting_tick and m.location.x == location.x and m.location.y == location.y) {
+                return try allocator.dupe(types.HatId, m.participants);
+            }
+        }
     }
-    return list.toOwnedSlice(allocator);
+    return null;
+}
+
+/// Find a meeting by tick + location and return an owned copy of its trades, or null.
+fn findMeetingTrades(allocator: std.mem.Allocator, taskforces: std.ArrayList(types.Taskforce), meeting_tick: types.Tick, location: types.Location) !?[]TradeRecord {
+    for (taskforces.items) |tf| {
+        for (tf.meeting_plan) |m| {
+            if (m.tick == meeting_tick and m.location.x == location.x and m.location.y == location.y) {
+                var list = try std.ArrayList(TradeRecord).initCapacity(allocator, m.trades.len);
+                for (m.trades) |ct| {
+                    try list.append(allocator, .{
+                        .sourceHatId = ct.source_hat_id,
+                        .recipientHatId = ct.recipient_hat_id,
+                        .capabilityId = ct.capability_id,
+                    });
+                }
+                return @as(?[]TradeRecord, try list.toOwnedSlice(allocator));
+            }
+        }
+    }
+    return null;
 }
 
 // ── Tests ──────────────────────────────────────────────────────────

@@ -41,6 +41,7 @@ test "paid queries return real data + noise model applies" {
     // 1) ib.capabilities — reads from hat_states
     {
         var args = try newObject(allocator);
+        defer args.deinit(allocator);
         try putInt(&args, "hatId", 0);
         try putFloat(&args, "payment", 10.0);
         const resp = try broker.call(allocator, run, .{
@@ -58,6 +59,7 @@ test "paid queries return real data + noise model applies" {
     // 2) ib.last_location — reads hat_states
     {
         var args = try newObject(allocator);
+        defer args.deinit(allocator);
         try putInt(&args, "hatId", 0);
         try putFloat(&args, "payment", 10.0);
         const resp = try broker.call(allocator, run, .{
@@ -81,6 +83,7 @@ test "paid queries return real data + noise model applies" {
     // 3) ib.meeting_times — scans taskforces
     {
         var args = try newObject(allocator);
+        defer args.deinit(allocator);
         try putInt(&args, "hatId", 0);
         try putFloat(&args, "payment", 10.0);
         const resp = try broker.call(allocator, run, .{
@@ -96,6 +99,7 @@ test "paid queries return real data + noise model applies" {
     // 4) ib.meeting_location — scans taskforces
     {
         var args = try newObject(allocator);
+        defer args.deinit(allocator);
         try putInt(&args, "hatId", 0);
         try putInt(&args, "tick", 0);
         try putFloat(&args, "payment", 10.0);
@@ -108,36 +112,45 @@ test "paid queries return real data + noise model applies" {
         std.debug.print("  OK meeting_location: noisy={}\n", .{resp.metadata.noisy});
     }
 
-    // 5) ib.meeting_participants — scans taskforces
+    // 5) ib.meeting_participants — scans taskforces (nested ObjectMap)
+    // ponytail: Build args via JSON stringify to avoid shared ObjectMap backing
+    // between loc_obj and args' value for "location". The cleanly-owned Value
+    // tree is then freed via jsonValueDeinit.
     {
-        var loc_obj = try newObject(allocator);
-        try putInt(&loc_obj, "x", 0);
-        try putInt(&loc_obj, "y", 0);
-        var args = try newObject(allocator);
-        try putInt(&args, "tick", 0);
-        try args.put(allocator, "location", .{ .object = loc_obj });
-        try putFloat(&args, "payment", 10.0);
+        const Location = struct { x: i64, y: i64 };
+        const Args = struct { tick: i64, location: Location, payment: f64 };
+        const json_text = try json_util.stringifyAlloc(allocator, Args{
+            .tick = 0,
+            .location = .{ .x = 0, .y = 0 },
+            .payment = 10.0,
+        });
+        defer allocator.free(json_text);
+        var args_value = try json_util.parseJsonValue(allocator, json_text);
+        defer json_util.jsonValueDeinit(allocator, &args_value);
         const resp = try broker.call(allocator, run, .{
             .runId = run_id, .analystId = "test",
-            .method = "ib.meeting_participants", .args = .{ .object = args },
+            .method = "ib.meeting_participants", .args = args_value,
         });
         defer json_util.jsonValueDeinit(allocator, &resp.result);
         try std.testing.expectEqualStrings("ib.meeting_participants", resp.method);
         std.debug.print("  OK meeting_participants: noisy={}\n", .{resp.metadata.noisy});
     }
 
-    // 6) ib.meeting_trades — scans taskforces
+    // 6) ib.meeting_trades — scans taskforces (nested ObjectMap)
     {
-        var loc_obj = try newObject(allocator);
-        try putInt(&loc_obj, "x", 0);
-        try putInt(&loc_obj, "y", 0);
-        var args = try newObject(allocator);
-        try putInt(&args, "tick", 0);
-        try args.put(allocator, "location", .{ .object = loc_obj });
-        try putFloat(&args, "payment", 10.0);
+        const Location = struct { x: i64, y: i64 };
+        const Args = struct { tick: i64, location: Location, payment: f64 };
+        const json_text = try json_util.stringifyAlloc(allocator, Args{
+            .tick = 0,
+            .location = .{ .x = 0, .y = 0 },
+            .payment = 10.0,
+        });
+        defer allocator.free(json_text);
+        var args_value = try json_util.parseJsonValue(allocator, json_text);
+        defer json_util.jsonValueDeinit(allocator, &args_value);
         const resp = try broker.call(allocator, run, .{
             .runId = run_id, .analystId = "test",
-            .method = "ib.meeting_trades", .args = .{ .object = args },
+            .method = "ib.meeting_trades", .args = args_value,
         });
         defer json_util.jsonValueDeinit(allocator, &resp.result);
         try std.testing.expectEqualStrings("ib.meeting_trades", resp.method);
@@ -147,6 +160,7 @@ test "paid queries return real data + noise model applies" {
     // 7) Zero payment → noisy for sure
     {
         var args = try newObject(allocator);
+        defer args.deinit(allocator);
         try putInt(&args, "hatId", 0);
         try putFloat(&args, "payment", 0.0);
         const resp = try broker.call(allocator, run, .{
@@ -162,6 +176,7 @@ test "paid queries return real data + noise model applies" {
     // 8) Unknown hat → empty capabilities (not noisy)
     {
         var args = try newObject(allocator);
+        defer args.deinit(allocator);
         try putInt(&args, "hatId", 999);
         try putFloat(&args, "payment", 10.0);
         const resp = try broker.call(allocator, run, .{
@@ -177,6 +192,7 @@ test "paid queries return real data + noise model applies" {
     // 9) Unknown hat → last_location null (not noisy)
     {
         var args = try newObject(allocator);
+        defer args.deinit(allocator);
         try putInt(&args, "hatId", 999);
         try putFloat(&args, "payment", 10.0);
         const resp = try broker.call(allocator, run, .{

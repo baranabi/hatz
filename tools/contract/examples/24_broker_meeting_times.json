@@ -1,0 +1,14 @@
+{
+  "contractVersion": "1.0.0",
+  "type": "broker.call",
+  "requestId": "req-24-broker-meeting-times",
+  "payload": {
+    "runId": "run-99999-2",
+    "analystId": "human",
+    "method": "ib.meeting_times",
+    "args": {
+      "hatId": 0,
+      "payment": 10.0
+    }
+  }
+}

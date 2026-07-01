@@ -1,0 +1,10 @@
+{
+  "contractVersion": "1.0.0",
+  "type": "sim.advance",
+  "requestId": "req-11-advance-2",
+  "payload": {
+    "runId": "run-99999-2",
+    "numberOfTicks": 20,
+    "includeDefaultRequestResults": false
+  }
+}

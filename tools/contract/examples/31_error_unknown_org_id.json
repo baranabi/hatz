@@ -1,0 +1,13 @@
+{
+  "contractVersion": "1.0.0",
+  "type": "broker.call",
+  "requestId": "req-31-error-unknown-org-id",
+  "payload": {
+    "runId": "run-99999-2",
+    "analystId": "human",
+    "method": "ib.members",
+    "args": {
+      "organizationId": 9999
+    }
+  }
+}

@@ -1,0 +1,1 @@
+{"contractVersion":"1.0.0","ok":true,"payload":{"method":"ib.capabilities","charged":10,"result":{"capabilities":[]},"metadata":{"tick":20,"noisy":true}},"error":null,"requestId":"req-23-broker-capabilities"}

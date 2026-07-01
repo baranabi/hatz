@@ -541,7 +541,13 @@ fn makeTestRunStateForMultiMeeting(allocator: std.mem.Allocator) !sim.RunState {
     var state = try makeTestRunState(allocator);
 
     // Replace meeting plan: intermediate at 10, final at 20.
-    allocator.free(state.taskforces.items[0].meeting_plan);
+    // Free old meeting_plan's inner allocations before replacing it.
+    const old_mp = state.taskforces.items[0].meeting_plan;
+    for (old_mp) |m| {
+        allocator.free(m.participants);
+        allocator.free(m.trades);
+    }
+    allocator.free(old_mp);
 
     const n_hats = state.hats.len;
     _ = n_hats;

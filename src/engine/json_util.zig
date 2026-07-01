@@ -32,9 +32,10 @@ pub fn jsonValueDeinit(allocator: std.mem.Allocator, value: *const std.json.Valu
             var obj = &v.object;
             var it = obj.iterator();
             while (it.next()) |entry| {
+                allocator.free(@constCast(entry.key_ptr.*));
                 jsonValueDeinit(allocator, entry.value_ptr);
             }
-            obj.deinit(allocator); // frees keys + internal map storage
+            obj.deinit(allocator); // frees backing storage + index header
         },
     }
 }

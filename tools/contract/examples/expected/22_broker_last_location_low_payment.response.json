@@ -1,0 +1,1 @@
+{"contractVersion":"1.0.0","ok":true,"payload":{"method":"ib.last_location","charged":0.5,"result":{"location":{"x":16,"y":12}},"metadata":{"tick":20,"noisy":true}},"error":null,"requestId":"req-22-broker-last-location-low"}

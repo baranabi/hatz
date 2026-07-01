@@ -1,0 +1,1 @@
+{"contractVersion":"1.0.0","ok":true,"payload":{"method":"ib.arrested_hats","charged":0,"result":{"hatIds":[]},"metadata":{"tick":20,"noisy":false}},"error":null,"requestId":"req-20-broker-arrested-hats"}

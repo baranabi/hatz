@@ -1,0 +1,11 @@
+{
+  "contractVersion": "1.0.0",
+  "type": "broker.call",
+  "requestId": "req-20-broker-arrested-hats",
+  "payload": {
+    "runId": "run-99999-2",
+    "analystId": "human",
+    "method": "ib.arrested_hats",
+    "args": {}
+  }
+}

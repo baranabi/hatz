@@ -1,0 +1,13 @@
+{
+  "contractVersion": "1.0.0",
+  "type": "broker.call",
+  "requestId": "req-32-error-unknown-hat-id",
+  "payload": {
+    "runId": "run-99999-2",
+    "analystId": "human",
+    "method": "ib.hat_advertised_color",
+    "args": {
+      "hatId": 9999
+    }
+  }
+}

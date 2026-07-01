@@ -1,0 +1,1 @@
+{"contractVersion":"1.0.0","ok":true,"payload":{"method":"ib.meeting_location","charged":10,"result":{"location":{"x":33,"y":47}},"metadata":{"tick":20,"noisy":true}},"error":null,"requestId":"req-25-broker-meeting-location"}

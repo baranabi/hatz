@@ -1,0 +1,1 @@
+{"contractVersion":"1.0.0","ok":true,"payload":{"method":"ib.clear_events_history","charged":0,"result":{"cleared":true},"metadata":{"tick":20,"noisy":false}},"error":null,"requestId":"req-19-broker-clear-events-history"}

@@ -1,0 +1,14 @@
+{
+  "contractVersion": "1.0.0",
+  "type": "action.arrest_hat",
+  "requestId": "req-29-action-arrest-hat-failure",
+  "payload": {
+    "runId": "run-99999-2",
+    "analystId": "human",
+    "hatId": 9999,
+    "location": {
+      "x": 99,
+      "y": 99
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "contractVersion": "1.0.0",
+  "type": "sim.initialize",
+  "requestId": "req-10-initialize-2",
+  "payload": {
+    "seed": 99999,
+    "params": {}
+  }
+}

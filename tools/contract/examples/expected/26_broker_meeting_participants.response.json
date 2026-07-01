@@ -1,0 +1,1 @@
+{"contractVersion":"1.0.0","ok":true,"payload":{"method":"ib.meeting_participants","charged":10,"result":{"hatIds":null},"metadata":{"tick":20,"noisy":true}},"error":null,"requestId":"req-26-broker-meeting-participants"}

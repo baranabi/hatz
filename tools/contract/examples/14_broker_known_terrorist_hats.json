@@ -1,0 +1,11 @@
+{
+  "contractVersion": "1.0.0",
+  "type": "broker.call",
+  "requestId": "req-14-broker-known-terrorist-hats",
+  "payload": {
+    "runId": "run-99999-2",
+    "analystId": "human",
+    "method": "ib.known_terrorist_hats",
+    "args": {}
+  }
+}

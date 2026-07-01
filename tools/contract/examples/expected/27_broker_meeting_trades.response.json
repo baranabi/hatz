@@ -1,0 +1,1 @@
+{"contractVersion":"1.0.0","ok":true,"payload":{"method":"ib.meeting_trades","charged":10,"result":{"trades":null},"metadata":{"tick":20,"noisy":true}},"error":null,"requestId":"req-27-broker-meeting-trades"}

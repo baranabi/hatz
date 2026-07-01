@@ -1,0 +1,11 @@
+{
+  "contractVersion": "1.0.0",
+  "type": "broker.call",
+  "requestId": "req-19-broker-clear-events-history",
+  "payload": {
+    "runId": "run-99999-2",
+    "analystId": "human",
+    "method": "ib.clear_events_history",
+    "args": {}
+  }
+}

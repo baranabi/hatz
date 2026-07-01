@@ -1,0 +1,18 @@
+{
+  "contractVersion": "1.0.0",
+  "type": "broker.call",
+  "requestId": "req-26-broker-meeting-participants",
+  "payload": {
+    "runId": "run-99999-2",
+    "analystId": "human",
+    "method": "ib.meeting_participants",
+    "args": {
+      "tick": 10,
+      "location": {
+        "x": 10,
+        "y": 10
+      },
+      "payment": 10.0
+    }
+  }
+}

@@ -1,0 +1,1 @@
+{"contractVersion":"1.0.0","ok":true,"payload":{"method":"ib.meeting_times","charged":10,"result":{"ticks":[]},"metadata":{"tick":20,"noisy":true}},"error":null,"requestId":"req-24-broker-meeting-times"}
