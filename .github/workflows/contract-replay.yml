@@ -70,6 +70,16 @@ jobs:
         run: bash tools/coverage.sh
       - name: Generate coverage step summary
         run: python3 tools/coverage-summary.py
+      - name: Debug coverage directory contents
+        run: |
+          echo "=== coverage dir tree ==="
+          find coverage/ -type f | sort
+          echo "=== coverage dir size ==="
+          du -sh coverage/
+          echo "=== cobertura search ==="
+          find coverage/ -name 'cobertura*' -o -name '*.xml' -o -name '*.json' 2>/dev/null | head -20
+          echo "=== kcov version ==="
+          kcov --version
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
