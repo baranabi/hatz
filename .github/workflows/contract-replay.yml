@@ -72,45 +72,21 @@ jobs:
         continue-on-error: true
         run: |
           python3 tools/coverage-summary.py
-      - name: Copy kcov native Cobertura XML to top level
-        continue-on-error: true
+      - name: Verify Cobertura XML exists
         run: |
-          # kcov outputs cobertura.xml at coverage/<exec-filename>.<hash>/cobertura.xml
-          # codecov-action expects it at the root of the search directory
-          NATIVE=$(find coverage/ -name cobertura.xml -type f 2>/dev/null | head -1)
-          {
-            echo "### kcov Native Cobertura XML"
-            if [ -n "$NATIVE" ]; then
-              cp "$NATIVE" coverage/cobertura.xml
-              echo "Copied $NATIVE to coverage/cobertura.xml ($(wc -c < coverage/cobertura.xml) bytes)"
-              grep -o 'lines-covered="[0-9]*"' coverage/cobertura.xml | head -1
-              grep -o 'line-rate="[^"]*"' coverage/cobertura.xml | head -1
-            else
-              echo "WARNING: no native cobertura.xml found under coverage/ (kcov may still be running or failed)"
-              echo "Files in coverage/:"
-              find coverage/ -type f | sort
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-      - name: Debug coverage directory contents
-        continue-on-error: true
-        run: |
-          {
-            echo "### Debug: coverage directory"
-            echo '```'
+          if [ -f coverage/cobertura.xml ]; then
+            echo "coverage/cobertura.xml exists ($(wc -c < coverage/cobertura.xml) bytes)"
+          else
+            echo "ERROR: coverage/cobertura.xml not found — kcov --cobertura-only likely failed"
+            echo "Files in coverage/:"
             find coverage/ -type f | sort
-            echo "---"
-            find coverage/ -name '*.xml' -o -name '*.json' -o -name '*.html' -o -name 'metadata' 2>/dev/null | sort
-            echo "---"
-            du -sh coverage/
-            echo "---"
-            kcov --version
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
-          directory: ./coverage
-          fail_ci_if_error: false
+          files: ./coverage/cobertura.xml
+          fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
       - name: Upload coverage report (artifact, fallback)
