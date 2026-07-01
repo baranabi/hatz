@@ -71,6 +71,5 @@ hatz-cli/__pycache__/
 /src/verify-*.zig
 /tools/verify-*.zig
 /tools/verify-*.sh
-/tools/coverage.sh
 /tools/hermes-verify-*.sh
 /hatz-cli/check_*.py
