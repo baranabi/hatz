@@ -46,8 +46,16 @@ jobs:
         with:
           version: 0.16.0
       - name: Install kcov
-        run: brew install kcov
+        run: |
+          brew install kcov
+          # kcov on macOS needs ad-hoc codesigning for ptrace debugging
+          KCOV_BIN=$(brew --prefix kcov)/bin/kcov
+          if [ -f "$KCOV_BIN" ]; then
+            codesign --entitlements "$(brew --prefix kcov)/share/kcov/osx-entitlements.xml" \
+              --force -s - "$KCOV_BIN" 2>/dev/null || true
+          fi
       - name: Run coverage
+        timeout-minutes: 5
         run: bash tools/coverage.sh
       - name: Generate coverage step summary
         continue-on-error: true

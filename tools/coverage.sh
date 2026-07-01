@@ -75,7 +75,7 @@ for bin in $TEST_BINS; do
         --skip-solibs \
         coverage/ \
         "$bin" \
-        2>&1 || true
+        2>&1 || echo "  (kcov failed for $bin)"
 done
 
 # Verify output
