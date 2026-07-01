@@ -2,6 +2,15 @@
 
 Deterministic tick-based multi-agent simulation engine. Implements the **Hats Simulator** (Cohen & Morrison, WSC 2004): a 2D grid world where hats (agents) move, organizations plan taskforces with meeting trees, beacons are attack targets, and an Information Broker provides noisy/paid intelligence to a defender.
 
+## Status
+
+The engine is **fully implemented** — no stubs or synthetic stand-ins remain. All Information Broker methods read from real seeded population state; the planner generates runtime-created taskforces with capability-trade routing; meetings execute with capability transfers; attacks trigger on the 4-condition rule; scoring reports information cost, false arrests, and beacon effectiveness.
+
+Verification:
+- **68 unit tests** (`zig build test`) — engine, broker actions, paid query noise model, population generation, movement
+- **33 contract fixtures** (`zig build replay-check`) — golden request/response pairs against the contracts/v1/ schemas
+- **Autonomous demo** (`zig build run`) — full 120-tick lifecycle with scoring report
+
 ## Build
 
 Requires Zig **0.16.0** (CI pins via `mlugg/setup-zig@v2`).
@@ -13,7 +22,7 @@ zig build
 # run autonomous demo (full sim lifecycle + scoring report)
 zig build run
 
-# run tests (inline zig test blocks)
+# run tests (68 unit tests)
 zig build test
 
 # contract fixture replay
@@ -39,7 +48,7 @@ src/engine/
 ├── defaults.zig    — per-analyst default request scheduling
 ├── runs.zig        — in-memory run registry
 ├── population.zig  — seed-driven population generator (hats, orgs, beacons)
-├── planner.zig     — generative meeting tree planner (taskforce creation)
+├── planner.zig     — generative meeting tree planner with capability-trade routing
 ├── meetings.zig    — meeting execution with capability trades
 ├── attack.zig      — beacon attack detection (4-condition rule)
 ├── json_util.zig   — JSON serialization helpers
@@ -47,6 +56,12 @@ src/engine/
 ```
 
 All state is deterministic from seed. Same seed + params + action sequence = identical output.
+
+Key components:
+
+- **planner.zig** — Generates meeting trees for runtime-created taskforces. For each required capability not already held by a taskforce member, finds an org member that holds the capability and schedules a trade at an intermediate or root meeting.
+- **meetings.zig** — Executes meetings with full capability trades and participant location updates.
+- **attack.zig** — Detects beacon attacks when a taskforce at a beacon's location holds capabilities covering the beacon's vulnerabilities.
 
 ## Contract Protocol
 
@@ -80,8 +95,8 @@ Message types:
 
 **Free queries** (no cost, always succeed):
 - `ib.world_dimensions`, `ib.beacons`, `ib.all_capabilities`
-- `ib.benign_organizations`, `ib.terrorist_organizations` (partial)
-- `ib.known_terrorist_hats` (partial)
+- `ib.benign_organizations`, `ib.terrorist_organizations` (partial — not all terrorist orgs revealed, per spec)
+- `ib.known_terrorist_hats` (partial — overt terrorists only; covert terrorists not included, per spec)
 - `ib.members`, `ib.hat_advertised_color`
 - `ib.events_history`, `ib.clear_events_history`, `ib.arrested_hats`
 
@@ -92,7 +107,7 @@ Message types:
 
 ## Contract Fixtures
 
-33 golden request/response pairs in `tools/contract/examples/`. Run `zig build replay-check` to verify the engine matches expected outputs.
+33 golden request/response pairs in `tools/contract/examples/`. Run `zig build replay-check` to verify the engine matches expected outputs. All 33 pass.
 
 ## Scoring
 
@@ -124,4 +139,15 @@ websocat ws://127.0.0.1:9876
 {"contractVersion":"1.0.0","type":"sim.initialize","requestId":"r1","payload":{"seed":42,"params":{}}}
 ```
 
-Go Charm TUI client: in development.
+### Python CLI
+
+A full-featured Python REPL client is at `hatz-cli/` with 14 commands (init, advance, end, beacons, orgs, members, loc, cap, alert, arrest, events, state, help, quit). See [hatz-cli/README.md](hatz-cli/README.md).
+
+```sh
+./hatz-cli/cli.py
+./hatz-cli/cli.py localhost:9876        # custom address
+```
+
+### Go TUI
+
+A Go Bubbletea TUI client at `hatz-tui/` with an interactive command UI, auto-initialization on connect, event log, and brokered query interface. The client supports `/advance`, `/beacons`, `/loc`, `/caps`, `/color`, `/orgs`, `/members`, `/events`, `/arrest`, `/alert`, `/score`, `/setdefaults`, and `/help` commands.
