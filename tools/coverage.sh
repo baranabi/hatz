@@ -40,56 +40,7 @@ if [ -z "$KCOV_VERSION" ]; then
 fi
 
 echo "kcov version: $KCOV_VERSION"
-
-# Quick test: verify kcov can trace processes (ptrace on Linux, task_for_pid on macOS)
-kcov_ok=0
-test_dir=$(mktemp -d)
-if kcov --clean "$test_dir" /bin/true >/dev/null 2>&1; then
-    kcov_ok=1
-fi
-rm -rf "$test_dir"
-
-if [ "$kcov_ok" -eq 0 ]; then
-    echo ""
-    echo "WARNING: kcov cannot trace processes on this system."
-    echo ""
-    echo "On macOS, kcov needs code signing or root for ptrace access:"
-    echo "  1) Sign with Apple Developer ID (recommended):"
-    echo "     codesign -s 'Developer ID Application:...' \\"
-    echo "       --entitlements osx-entitlements.xml -f \$(which kcov)"
-    echo ""
-    echo "  2) Or run this script as root:"
-    echo "     sudo bash tools/coverage.sh"
-    echo ""
-    echo "  3) Or run on Linux (CI, Docker):"
-    echo "     docker run --rm -v \$PWD:/src alpine/kcov ..."
-    echo ""
-    echo "Falling back: running tests and collecting coverage via llvm-cov"
-    echo "(less detailed: no per-line hit counts, source listing only)"
-    echo ""
-
-    # Fallback: produce a source listing with debug info
-    echo "Building test executables..."
-    "$ZIG" build test -- --color off 2>&1
-
-    # Find test binary
-    TEST_BIN=$(find .zig-cache -name "test" -type f -perm +111 2>/dev/null \
-        | sort -t'/' -k7 -r | head -1)
-
-    if [ -z "$TEST_BIN" ]; then
-        echo "ERROR: no test binary found." >&2
-        exit 1
-    fi
-
-    echo "Test binary at: $TEST_BIN"
-    echo ""
-    echo "Coverage is not available on this macOS setup without signing kcov."
-    echo "To set up proper coverage, see instructions above."
-    echo ""
-    echo "Source files for reference:"
-    echo "  src/engine/"
-    exit 0
-fi
+echo ""
 
 # Clean previous coverage
 rm -rf coverage/
