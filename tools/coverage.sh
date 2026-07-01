@@ -30,7 +30,7 @@ if [ -z "$KCOV_VERSION" ]; then
     echo "kcov not available — skipping code coverage."
     echo ""
     echo "Building test executables..."
-    "$ZIG" build test -- --color off 2>&1
+    "$ZIG" build test 2>&1
     echo ""
     echo "Coverage skipped (no kcov). To install:"
     echo "  Linux: sudo apt install kcov  (or build from source)"
@@ -47,7 +47,7 @@ rm -rf coverage/
 
 # Build test executables
 echo "Building test executables..."
-"$ZIG" build test -- --color off 2>&1 || {
+"$ZIG" build test 2>&1 || {
     echo "ERROR: zig build test failed" >&2
     exit 1
 }

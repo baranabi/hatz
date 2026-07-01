@@ -50,7 +50,6 @@ jobs:
             binutils-dev build-essential cmake pkg-config libssl-dev \
             libcurl4-openssl-dev libelf-dev zlib1g-dev \
             libdw-dev libiberty-dev
-          sudo ldconfig
       - name: Build kcov from source
         run: |
           git clone --depth 1 \
@@ -61,56 +60,12 @@ jobs:
             -DCMAKE_INSTALL_PREFIX=/usr ..
           make -j"$(nproc)"
           sudo make install
-          sudo ldconfig
-      - name: kcov ptrace check
-        run: |
-          echo "=== ptrace_scope ==="
-          cat /proc/sys/kernel/yama/ptrace_scope 2>/dev/null || echo "(not available)"
-          echo "=== Direct kcov test ==="
-          TD=$(mktemp -d)
-          kcov --clean "$TD" /bin/true 2>&1; echo "exit=$?"
-          ls -la "$TD" 2>&1 || echo "(no output)"
-          rm -rf "$TD"
       - name: Verify kcov
         run: |
           which kcov
           kcov --version
-          file "$(which kcov)"
-          ldd "$(which kcov)" 2>&1 | head -20 || true
       - name: Run coverage
-        run: |
-          bash tools/coverage.sh 2>&1 | tee /tmp/coverage-output.txt
-          echo "EXIT_CODE=$?"
-      - name: Check coverage report
-        run: |
-          echo "=== coverage/ directory ==="
-          if [ -d coverage ]; then
-            echo "EXISTS:"
-            ls -la coverage/
-            find coverage/ -type f | sort
-            echo "FILES: $(find coverage/ -type f | wc -l | tr -d ' ')"
-            echo "=== Summary ==="
-            cat coverage/summary.txt 2>/dev/null || echo "(no summary.txt)"
-            head -100 coverage/index.html 2>/dev/null || echo "(no index.html)"
-          else
-            echo "MISSING: coverage/ directory does not exist"
-            echo "=== Debug artifact contents ==="
-            cat /tmp/coverage-output.txt
-            echo "=== kcov binary ==="
-            file "$(which kcov)"
-            ldd "$(which kcov)" 2>&1 | head -20
-            echo "=== zig-cache test bins ==="
-            find .zig-cache -name "test" -type f 2>/dev/null | head -5
-            echo "=== zig-cache ls ==="
-            ls -la .zig-cache/o/ 2>/dev/null | head -5
-          fi
-      - name: Upload coverage debug log (always)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-debug
-          path: /tmp/coverage-output.txt
-          retention-days: 3
+        run: bash tools/coverage.sh
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
