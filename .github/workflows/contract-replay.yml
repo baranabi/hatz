@@ -84,11 +84,20 @@ jobs:
       - name: Check coverage report
         run: |
           echo "=== coverage/ directory ==="
-          ls -la coverage/ 2>&1 || echo "(no coverage directory)"
-          echo "=== coverage/ files ==="
-          find coverage/ -type f 2>/dev/null | head -20 || echo "(empty)"
-          echo "=== Debug artifact ==="
-          cat /tmp/coverage-output.txt 2>/dev/null || echo "(no debug file)"
+          if [ -d coverage ]; then
+            echo "EXISTS:"
+            find coverage/ -type f | sort
+            echo "FILES: $(find coverage/ -type f | wc -l | tr -d ' ')"
+          else
+            echo "MISSING: coverage/ directory does not exist"
+            echo "=== Debug artifact contents ==="
+            cat /tmp/coverage-output.txt
+            echo "=== kcov binary ==="
+            file "$(which kcov)"
+            ldd "$(which kcov)" 2>&1 | head -20
+            echo "=== zig-cache test bins ==="
+            find .zig-cache -name "test" -type f 2>/dev/null | head -5
+          fi
       - name: Upload coverage debug log (always)
         if: always()
         uses: actions/upload-artifact@v4
