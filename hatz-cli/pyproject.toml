@@ -1,0 +1,7 @@
+[project]
+name = "hatz-cli"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "websocket-client>=1.9.0",
+]
