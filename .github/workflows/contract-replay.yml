@@ -58,8 +58,7 @@ jobs:
           cd /tmp/kcov-src
           mkdir -p build && cd build
           cmake -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=/usr \
-            -DKCOV_STATIC_BUILD=ON ..
+            -DCMAKE_INSTALL_PREFIX=/usr ..
           make -j"$(nproc)"
           sudo make install
           sudo ldconfig
@@ -68,7 +67,7 @@ jobs:
           which kcov
           kcov --version
           file "$(which kcov)"
-          ldd "$(which kcov)" 2>&1 | head -20 || echo "(static binary — no dynamic deps)"
+          ldd "$(which kcov)" 2>&1 | head -20 || true
       - name: Run coverage
         run: bash tools/coverage.sh
       - name: Upload coverage report
