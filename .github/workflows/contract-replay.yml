@@ -37,7 +37,6 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true  # non-blocking — step summary & artifact survive
     permissions:
-      id-token: write   # for Codecov OIDC auth (no token needed for public repos)
       contents: read
     steps:
       - name: Checkout
@@ -76,7 +75,7 @@ jobs:
         with:
           directory: ./coverage
           fail_ci_if_error: false
-          use_oidc: true
+          token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
       - name: Upload coverage report (artifact, fallback)
         uses: actions/upload-artifact@v4
