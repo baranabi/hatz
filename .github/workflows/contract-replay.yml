@@ -51,7 +51,7 @@ jobs:
           # (standard kcov breaks on Linux due to DWARF/ELF issues with Zig output)
           KCOV_VERSION="v42.0.1"
           curl -sL "https://github.com/roc-lang/zig-kcov/releases/download/${KCOV_VERSION}/kcov-x86_64-linux.tar.gz" \
-            | tar xz -C /tmp
+            | tar xz -C /tmp --no-overwrite-dir || true
           # Binary is at /tmp/kcov-x86_64-linux/bin/kcov (or similar) — find it
           KCOV_BIN=$(find /tmp -name kcov -type f -perm -111 | head -1)
           if [ -z "$KCOV_BIN" ]; then
