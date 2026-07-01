@@ -75,7 +75,7 @@ for bin in $TEST_BINS; do
         --skip-solibs \
         coverage/ \
         "$bin" \
-        2>&1 | grep -v 'kcov: debug: ' || true
+        2>&1 || true
 done
 
 # Verify output
