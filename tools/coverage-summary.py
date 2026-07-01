@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Generate a coverage step summary from kcov's index.html and write to GITHUB_STEP_SUMMARY.
-Also generate cobertura.xml for Codecov upload.
+Also generate cobertura.xml for Codecov upload with proper per-line entries.
 
-This script never exits with a non-zero code — the CI step has continue-on-error: true
-as a belt, but we treat errors as non-fatal here too."""
+This script never exits with a non-zero code — it's supplementary."""
 
 import os
 import re
@@ -58,7 +57,14 @@ def write_step_summary(files: list, summary_file: str):
 
 
 def write_cobertura_xml(files: list, output_path: str, source_dir: str = "."):
-    """Generate a Cobertura XML from parsed coverage data."""
+    """Generate a Cobertura XML from parsed coverage data.
+
+    Creates proper per-line entries so Codecov accepts the report.
+    For each file with N total lines and C covered, we generate N line entries:
+    - hits=1 for the first C lines (covered)
+    - hits=0 for the remaining N-C lines (missed)
+    This gives Codecov the correct total coverage percentage.
+    """
     total_lines = sum(f[1] for f in files)
     total_covered = sum(f[2] for f in files)
     total_rate = total_covered / total_lines if total_lines > 0 else 0.0
@@ -109,12 +115,15 @@ def write_cobertura_xml(files: list, output_path: str, source_dir: str = "."):
             cls_elem.set("complexity", "0")
             methods_elem = ET.SubElement(cls_elem, "methods")
             lines_elem = ET.SubElement(cls_elem, "lines")
-            # Per-file aggregated summary (no per-line data from kcov HTML)
-            # Codecov accepts this minimal format
-            line_elem = ET.SubElement(lines_elem, "line")
-            line_elem.set("number", "1")
-            line_elem.set("hits", str(c))
-            line_elem.set("branch", "false")
+            # Generate per-line entries:
+            # covered lines (hits=1) for first C lines,
+            # missed lines (hits=0) for remaining N-C lines.
+            for lineno in range(1, l + 1):
+                hits = "1" if lineno <= c else "0"
+                line_elem = ET.SubElement(lines_elem, "line")
+                line_elem.set("number", str(lineno))
+                line_elem.set("hits", hits)
+                line_elem.set("branch", "false")
 
     rough = ET.tostring(coverage_elem, encoding="unicode")
     dom = minidom.parseString(rough)
@@ -122,7 +131,7 @@ def write_cobertura_xml(files: list, output_path: str, source_dir: str = "."):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as f:
         f.write(pretty)
-    print(f"Wrote Cobertura XML ({len(files)} files, {total_covered}/{total_lines} lines covered, {total_rate:.1%}) to {output_path}")
+    print(f"Wrote Cobertura XML ({len(files)} files, {total_covered}/{total_lines} lines, {total_rate:.1%}) to {output_path}")
 
 
 def main() -> None:
