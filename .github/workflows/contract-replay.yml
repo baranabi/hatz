@@ -72,32 +72,12 @@ jobs:
         continue-on-error: true
         run: |
           python3 tools/coverage-summary.py
-      - name: Verify Cobertura XML exists
+      - name: Generate Cobertura XML for Codecov
         run: |
-          echo "### Coverage output files" >> "$GITHUB_STEP_SUMMARY"
-          
-          # Check if kcov's native cobertura.xml exists at output root
-          if [ -f coverage/cobertura.xml ]; then
-            echo "coverage/cobertura.xml exists ($(wc -c < coverage/cobertura.xml) bytes)"
-            ls -la coverage/cobertura.xml >> "$GITHUB_STEP_SUMMARY"
-          elif [ -f coverage/cov.xml ]; then
-            echo "coverage/cov.xml exists ($(wc -c < coverage/cov.xml) bytes) — using for Codecov"
-            cp coverage/cov.xml coverage/cobertura.xml
-            ls -la coverage/cobertura.xml coverage/cov.xml >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "Native Cobertura XML not found — regenerating with kcov --report-only --cobertura-only"
-            # --report-only regenerates output from stored coverage data without re-tracing
-            # --cobertura-only outputs cov.xml (not cobertura.xml due to kcov cobertura-writer logic)
-            kcov --report-only --cobertura-only coverage/ 2>&1 || true
-            if [ -f coverage/cov.xml ]; then
-              cp coverage/cov.xml coverage/cobertura.xml
-              echo "Regenerated coverage/cobertura.xml via --report-only ($(wc -c < coverage/cobertura.xml) bytes)"
-            else
-              echo "ERROR: still no Cobertura XML after --report-only. Files in coverage/:"
-              find coverage/ -type f | sort
-              exit 1
-            fi
-          fi
+          python3 tools/cobertura-gen.py
+          echo "### Cobertura XML" >> "$GITHUB_STEP_SUMMARY"
+          wc -c coverage/cobertura.xml >> "$GITHUB_STEP_SUMMARY"
+          head -3 coverage/cobertura.xml >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
