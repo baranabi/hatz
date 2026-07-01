@@ -1,5 +1,8 @@
 # hatz
 
+[![CI](https://github.com/baranabi/hatz/actions/workflows/contract-replay.yml/badge.svg)](https://github.com/baranabi/hatz/actions/workflows/contract-replay.yml)
+[![codecov](https://codecov.io/gh/baranabi/hatz/branch/main/graph/badge.svg)](https://codecov.io/gh/baranabi/hatz)
+
 Deterministic tick-based multi-agent simulation engine. Implements the **Hats Simulator** (Cohen & Morrison, WSC 2004): a 2D grid world where hats (agents) move, organizations plan taskforces with meeting trees, beacons are attack targets, and an Information Broker provides noisy/paid intelligence to a defender.
 
 ## Status

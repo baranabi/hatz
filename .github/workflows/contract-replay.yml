@@ -35,7 +35,10 @@ jobs:
   coverage:
     needs: build
     runs-on: ubuntu-latest
-    continue-on-error: true  # non-blocking — threshold enforcement added later
+    continue-on-error: true  # non-blocking — step summary & artifact survive
+    permissions:
+      id-token: write   # for Codecov OIDC auth (no token needed for public repos)
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -66,7 +69,16 @@ jobs:
           kcov --version
       - name: Run coverage
         run: bash tools/coverage.sh
-      - name: Upload coverage report
+      - name: Generate coverage step summary
+        run: python3 tools/coverage-summary.py
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          directory: ./coverage
+          fail_ci_if_error: false
+          use_oidc: true
+          verbose: true
+      - name: Upload coverage report (artifact, fallback)
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
